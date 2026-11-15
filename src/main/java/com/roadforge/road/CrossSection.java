@@ -3,8 +3,14 @@ package com.roadforge.road;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Поперечный профиль: колонки слева направо (по ходу движения). */
-public record CrossSection(List<Kind> cols, int ref, int lampLeft, int lampRight) {
+/**
+ * Поперечный профиль: колонки слева направо (по ходу движения).
+ * ref - центральная колонка проезжей части (осевая / середина разделителя), от неё считаются смещения.
+ * roadFirst..roadLast - вся проезжая часть вместе с парковкой.
+ * depths - для колонок парковки: расстояние от проезжей части (0 = рядом с ней).
+ */
+public record CrossSection(List<Kind> cols, List<Integer> depths, int ref, int lampLeft, int lampRight,
+                           int roadFirst, int roadLast) {
 
     public int width() {
         return cols.size();
@@ -12,66 +18,88 @@ public record CrossSection(List<Kind> cols, int ref, int lampLeft, int lampRight
 
     public static CrossSection build(RoadSpec s) {
         List<Kind> c = new ArrayList<>();
-        int n = s.lanes() / 2;          // полос в одну сторону
-        int pave = s.laneWidth();       // колонок асфальта в одной полосе
+        List<Integer> d = new ArrayList<>();
+        int n = s.lanes() / 2;
+        int pave = s.laneWidth();
 
-        repeat(c, Kind.SIDEWALK_L, s.sidewalkWidth());
-        repeat(c, Kind.GRASS, s.shoulderWidth());
+        add(c, d, Kind.SIDEWALK_L, s.sidewalkWidth());
+        add(c, d, Kind.GRASS, s.shoulderWidth());
 
-        if (s.medianWidth() > 0) {
-            carriageway(c, s, n, pave);
-            repeat(c, Kind.GRASS, s.medianWidth());
-            carriageway(c, s, n, pave);
-        } else {
-            edge(c, s);
-            half(c, s, n, pave);
-            boundary(c, s, Kind.LINE_SOLID);          // осевая
-            if (s.doubleCenter()) {
-                boundary(c, s, Kind.LINE_SOLID);      // двойная сплошная
+        int roadFirst = c.size();
+        boolean parking = s.parkType() != ParkType.NONE;
+        int pd = Math.max(1, s.parkDepth());
+        if (parking && s.parkLeft()) {
+            for (int k = pd - 1; k >= 0; k--) {
+                c.add(k == 0 ? Kind.PARK_EDGE : Kind.PARK_BAY);
+                d.add(k);
             }
-            half(c, s, n, pave);
-            edge(c, s);
         }
 
-        repeat(c, Kind.GRASS, s.shoulderWidth());
-        repeat(c, Kind.SIDEWALK_R, s.sidewalkWidth());
+        int coreFirst = c.size();
+        if (s.medianWidth() > 0) {
+            carriageway(c, d, s, n, pave);
+            add(c, d, Kind.GRASS, s.medianWidth());
+            carriageway(c, d, s, n, pave);
+        } else {
+            edge(c, d, s);
+            half(c, d, s, n, pave);
+            boundary(c, d, s, Kind.LINE_SOLID);
+            if (s.doubleCenter() && s.markings()) {
+                add(c, d, Kind.ASPHALT, 1);              // двойная сплошная: линия, зазор, линия
+                boundary(c, d, s, Kind.LINE_SOLID);
+            }
+            half(c, d, s, n, pave);
+            edge(c, d, s);
+        }
+        int coreLast = c.size() - 1;
+
+        if (parking && s.parkRight()) {
+            for (int k = 0; k < pd; k++) {
+                c.add(k == 0 ? Kind.PARK_EDGE : Kind.PARK_BAY);
+                d.add(k);
+            }
+        }
+        int roadLast = c.size() - 1;
+
+        add(c, d, Kind.GRASS, s.shoulderWidth());
+        add(c, d, Kind.SIDEWALK_R, s.sidewalkWidth());
 
         boolean lamps = s.sidewalkWidth() > 0 && s.lampSpacing() > 0;
-        return new CrossSection(List.copyOf(c), c.size() / 2, lamps ? 0 : -1, lamps ? c.size() - 1 : -1);
+        return new CrossSection(List.copyOf(c), List.copyOf(d), (coreFirst + coreLast) / 2,
+                lamps ? 0 : -1, lamps ? c.size() - 1 : -1, roadFirst, roadLast);
     }
 
-    private static void carriageway(List<Kind> c, RoadSpec s, int n, int pave) {
-        edge(c, s);
-        half(c, s, n, pave);
-        edge(c, s);
+    private static void carriageway(List<Kind> c, List<Integer> d, RoadSpec s, int n, int pave) {
+        edge(c, d, s);
+        half(c, d, s, n, pave);
+        edge(c, d, s);
     }
 
     /** n полос: pave, разметка, pave, разметка, ..., pave */
-    private static void half(List<Kind> c, RoadSpec s, int n, int pave) {
+    private static void half(List<Kind> c, List<Integer> d, RoadSpec s, int n, int pave) {
         for (int lane = 0; lane < n; lane++) {
-            repeat(c, Kind.ASPHALT, pave);
+            add(c, d, Kind.ASPHALT, pave);
             if (lane < n - 1) {
-                boundary(c, s, Kind.LINE_DASH);
+                boundary(c, d, s, Kind.LINE_DASH);
             }
         }
     }
 
-    /** Краевая линия (по умолчанию выключена: на краю сразу бордюр). */
-    private static void edge(List<Kind> c, RoadSpec s) {
+    private static void edge(List<Kind> c, List<Integer> d, RoadSpec s) {
         if (s.markings() && s.edgeLines()) {
-            c.add(Kind.LINE_SOLID);
+            add(c, d, Kind.LINE_SOLID, 1);
         }
     }
 
-    private static void boundary(List<Kind> c, RoadSpec s, Kind k) {
-        if (s.markings()) {
-            c.add(k);
-        }
+    /** Колонка между полосами: линия, а без разметки - обычный асфальт (чтобы ширина не менялась). */
+    private static void boundary(List<Kind> c, List<Integer> d, RoadSpec s, Kind k) {
+        add(c, d, s.markings() ? k : Kind.ASPHALT, 1);
     }
 
-    private static void repeat(List<Kind> c, Kind k, int count) {
+    private static void add(List<Kind> c, List<Integer> d, Kind k, int count) {
         for (int i = 0; i < count; i++) {
             c.add(k);
+            d.add(0);
         }
     }
 }

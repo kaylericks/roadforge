@@ -6,7 +6,9 @@ public enum Role {
     LINE("Разметка"),
     SIDEWALK("Тротуар"),
     GRASS("Газон"),
-    LAMP("Фонарь");
+    LAMP("Фонарь"),
+    CROSSWALK("Зебра"),
+    DIAGONAL("Диагональ");
 
     public final String title;
 

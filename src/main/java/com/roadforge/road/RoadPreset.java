@@ -34,17 +34,14 @@ public enum RoadPreset {
         return v - (v % 2);
     }
 
-    /**
-     * Полоса = 3 блока асфальта; между полосами колонка разметки (1 блок);
-     * на краю сразу бордюр (тротуар), без краевой линии.
-     */
     public RoadSpec create(int requestedLanes) {
         int l = clampLanes(requestedLanes);
+        ParkType pt = ParkType.NONE;
         return switch (this) {
-            //                preset      lanes      lw  marks edge   dblCenter median sidewalk shoulder lamps on gap caps
-            case CITY ->     new RoadSpec("city",     l,           3, true,  false, l >= 4, 0, 3, 0, 12, 1, 3, true);
-            case ARTERIAL -> new RoadSpec("arterial", Math.max(4, l), 3, true,  false, false,  3, 3, 0, 16, 1, 3, true);
-            case DACHA ->    new RoadSpec("dacha",    2,           3, false, false, false,  0, 0, 1, 0,  1, 3, true);
+            //                preset      lanes           lw  marks edge   dblCtr   median sw shd lamps on gap caps  park
+            case CITY ->     new RoadSpec("city",     l,            3, true,  false, l >= 4, 0, 3, 0, 12, 1, 3, true, pt, false, false, 2, 6);
+            case ARTERIAL -> new RoadSpec("arterial", Math.max(4, l), 3, true,  false, false,  3, 3, 0, 16, 1, 3, true, pt, false, false, 2, 6);
+            case DACHA ->    new RoadSpec("dacha",    2,            3, false, false, false,  0, 0, 1, 0,  1, 3, true, pt, false, false, 2, 6);
         };
     }
 }

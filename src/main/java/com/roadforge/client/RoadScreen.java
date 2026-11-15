@@ -7,7 +7,10 @@ import com.mojang.math.Axis;
 import com.roadforge.compat.BlockLookup;
 import com.roadforge.network.ActionPacket;
 import com.roadforge.network.Net;
+import com.roadforge.road.BuildMode;
 import com.roadforge.road.CrossSection;
+import com.roadforge.road.IntersectionPlan;
+import com.roadforge.road.ParkType;
 import com.roadforge.road.Placement;
 import com.roadforge.road.RoadPlan;
 import com.roadforge.road.RoadPreset;
@@ -27,7 +30,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -36,7 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Главное меню: параметры дороги слева, живое 3D-превью справа. */
+/** Главное меню: параметры слева (5 вкладок), живое 3D-превью справа. */
 public class RoadScreen extends Screen {
     private static final int PANEL_X = 10;
     private static final int PANEL_W = 236;
@@ -48,7 +50,7 @@ public class RoadScreen extends Screen {
     private final List<Label> labels = new ArrayList<>();
     private final List<Icon> icons = new ArrayList<>();
 
-    private int tab = 0; // 0 - дорога, 1 - блоки
+    private int tab = 0; // 0 дорога, 1 блоки, 2 парковка, 3 перекрёсток, 4 повороты
     private float yaw = 30f;
     private float pitch = 40f;
     private float zoom = 1f;
@@ -57,8 +59,6 @@ public class RoadScreen extends Screen {
 
     private List<Placement> cache;
     private float centerX, centerZ, baseScale;
-    private int previewLen;
-    private int previewWidth;
 
     public RoadScreen() {
         super(Component.literal("RoadForge"));
@@ -77,21 +77,19 @@ public class RoadScreen extends Screen {
         py2 = height - 34;
 
         int x = PANEL_X + 4;
-        int y = 28;
-        btn(tab == 0 ? "§e▶ Дорога" : "Дорога", x, y, 112, () -> {
-            tab = 0;
-            rebuildWidgets();
-        });
-        btn(tab == 1 ? "§e▶ Блоки" : "Блоки", x + 118, y, 112, () -> {
-            tab = 1;
-            rebuildWidgets();
-        });
+        tabBtn("Дорога", 0, x, 26, 74);
+        tabBtn("Блоки", 1, x + 78, 26, 74);
+        tabBtn("Парковка", 2, x + 156, 26, 72);
+        tabBtn("Перекрёсток", 3, x, 48, 112);
+        tabBtn("Повороты", 4, x + 116, 48, 112);
 
-        y += 28;
-        if (tab == 0) {
-            initRoadTab(x, y);
-        } else {
-            initBlocksTab(x, y);
+        int y = 76;
+        switch (tab) {
+            case 0 -> initRoadTab(x, y);
+            case 1 -> initBlocksTab(x, y);
+            case 2 -> initParkTab(x, y);
+            case 3 -> initCrossTab(x, y);
+            default -> initTurnTab(x, y);
         }
 
         int by = height - 28;
@@ -101,13 +99,19 @@ public class RoadScreen extends Screen {
         btn("Закрыть", width - 100, by, 90, this::onClose);
     }
 
+    private void tabBtn(String text, int idx, int x, int y, int w) {
+        btn((tab == idx ? "§e▶ " : "") + text, x, y, w, () -> {
+            tab = idx;
+            rebuildWidgets();
+        });
+    }
+
     private void initRoadTab(int x, int y) {
         label(x, y + 6, "Тип:");
         int bx = x + 34;
         for (RoadPreset p : RoadPreset.values()) {
             final RoadPreset preset = p;
-            String t = s.preset == p ? "§e" + p.title : p.title;
-            btn(t, bx, y, 66, () -> {
+            btn(s.preset == p ? "§e" + p.title : p.title, bx, y, 66, () -> {
                 s.applyPreset(preset);
                 changed();
             });
@@ -125,19 +129,23 @@ public class RoadScreen extends Screen {
         }
 
         y += 26;
-        stepper(x, y, "Ширина полосы", s.laneWidth, () -> s.laneWidth = Math.max(2, s.laneWidth - 1),
+        stepper(x, y, "Ширина полосы", String.valueOf(s.laneWidth),
+                () -> s.laneWidth = Math.max(2, s.laneWidth - 1),
                 () -> s.laneWidth = Math.min(5, s.laneWidth + 1));
         y += 22;
-        stepper(x, y, "Тротуар", s.sidewalkWidth, () -> s.sidewalkWidth = Math.max(0, s.sidewalkWidth - 1),
+        stepper(x, y, "Тротуар", String.valueOf(s.sidewalkWidth),
+                () -> s.sidewalkWidth = Math.max(0, s.sidewalkWidth - 1),
                 () -> s.sidewalkWidth = Math.min(8, s.sidewalkWidth + 1));
         y += 22;
-        stepper(x, y, "Газон-разделитель", s.medianWidth, () -> s.medianWidth = Math.max(0, s.medianWidth - 1),
-                () -> s.medianWidth = Math.min(9, s.medianWidth + 1));
+        stepper(x, y, "Разделитель (нечёт.)", String.valueOf(s.medianWidth),
+                () -> s.medianWidth = s.medianWidth <= 1 ? 0 : s.medianWidth - 2,
+                () -> s.medianWidth = s.medianWidth == 0 ? 1 : Math.min(9, s.medianWidth + 2));
         y += 22;
-        stepper(x, y, "Обочина (газон)", s.shoulderWidth, () -> s.shoulderWidth = Math.max(0, s.shoulderWidth - 1),
+        stepper(x, y, "Обочина (газон)", String.valueOf(s.shoulderWidth),
+                () -> s.shoulderWidth = Math.max(0, s.shoulderWidth - 1),
                 () -> s.shoulderWidth = Math.min(4, s.shoulderWidth + 1));
         y += 22;
-        stepper(x, y, "Шаг фонарей (0=нет)", s.lampSpacing,
+        stepper(x, y, "Шаг фонарей (0=нет)", String.valueOf(s.lampSpacing),
                 () -> s.lampSpacing = s.lampSpacing <= 6 ? 0 : s.lampSpacing - 2,
                 () -> s.lampSpacing = s.lampSpacing == 0 ? 6 : Math.min(48, s.lampSpacing + 2));
 
@@ -161,9 +169,109 @@ public class RoadScreen extends Screen {
                         changed();
                     })));
             icons.add(new Icon(x + 204, y + 2, id));
-            y += 26;
+            y += 24;
         }
-        label(x, y + 4, "Клик по кнопке — список блоков (моды / обычные).");
+        label(x, y + 4, "Клик по кнопке: список блоков (моды / обычные).");
+    }
+
+    private void initParkTab(int x, int y) {
+        label(x, y + 6, "Тип:");
+        ParkType[] types = ParkType.values();
+        for (int i = 0; i < types.length; i++) {
+            final ParkType t = types[i];
+            btn((s.parkType == t ? "§e" : "") + t.shortTitle, x + 34 + i * 50, y, 48, () -> {
+                s.parkType = t;
+                if (t != ParkType.NONE) {
+                    s.parkDepth = t.depth;
+                    s.parkPitch = t.pitch;
+                    if (!s.parkLeft && !s.parkRight) {
+                        s.parkRight = true;
+                    }
+                }
+                changed();
+            });
+        }
+        y += 26;
+        toggle(x, y, "Справа (по ходу)", s.parkRight, () -> s.parkRight = !s.parkRight);
+        toggle(x + 118, y, "Слева", s.parkLeft, () -> s.parkLeft = !s.parkLeft);
+        y += 26;
+        stepper(x, y, "Глубина места", String.valueOf(s.parkDepth),
+                () -> s.parkDepth = Math.max(1, s.parkDepth - 1),
+                () -> s.parkDepth = Math.min(6, s.parkDepth + 1));
+        y += 22;
+        stepper(x, y, "Шаг мест (блоков)", String.valueOf(s.parkPitch),
+                () -> s.parkPitch = Math.max(2, s.parkPitch - 1),
+                () -> s.parkPitch = Math.min(10, s.parkPitch + 1));
+        y += 30;
+        label(x, y, "Парковка идёт между полосой и тротуаром.");
+        label(x, y + 12, "На перекрёстках она рисуется как асфальт.");
+    }
+
+    private void initCrossTab(int x, int y) {
+        btn((s.mode == BuildMode.ROAD ? "§e" : "") + "Режим: дорога", x, y, 114, () -> {
+            s.mode = BuildMode.ROAD;
+            changed();
+        });
+        btn((s.mode == BuildMode.INTERSECTION ? "§e" : "") + "Режим: перекр.", x + 118, y, 114, () -> {
+            s.mode = BuildMode.INTERSECTION;
+            changed();
+        });
+        y += 26;
+        label(x, y + 6, "Поперечная:");
+        for (int i = 0; i < 3; i++) {
+            final int lanes = 2 + i * 2;
+            btn((s.crossLanes == lanes ? "§e" : "") + lanes, x + 80 + i * 44, y, 40, () -> {
+                s.crossLanes = lanes;
+                changed();
+            });
+        }
+        y += 26;
+        label(x, y + 6, "Ветки:");
+        smallToggle(x + 50, y, "С", s.armN, () -> s.armN = !s.armN);
+        smallToggle(x + 92, y, "В", s.armE, () -> s.armE = !s.armE);
+        smallToggle(x + 134, y, "Ю", s.armS, () -> s.armS = !s.armS);
+        smallToggle(x + 176, y, "З", s.armW, () -> s.armW = !s.armW);
+        y += 26;
+        stepper(x, y, "Длина веток", String.valueOf(s.armLength),
+                () -> s.armLength = Math.max(4, s.armLength - 2),
+                () -> s.armLength = Math.min(48, s.armLength + 2));
+        y += 22;
+        stepper(x, y, "Радиус углов", String.valueOf(s.cornerRadius),
+                () -> s.cornerRadius = Math.max(0, s.cornerRadius - 1),
+                () -> s.cornerRadius = Math.min(8, s.cornerRadius + 1));
+        y += 26;
+        toggle(x, y, "Зебры и стоп-линии", s.crosswalks, () -> s.crosswalks = !s.crosswalks);
+        y += 28;
+        label(x, y, "Главная дорога = настройки вкладки «Дорога».");
+        label(x, y + 12, "Центр ставится одним ПКМ жезла,");
+        label(x, y + 24, "Shift+ПКМ строит. Две соседние ветки = поворот.");
+    }
+
+    private void initTurnTab(int x, int y) {
+        label(x, y, "Подгонка ориентации моделей (×90°).");
+        label(x, y + 12, "Превью справа сразу показывает результат.");
+        y += 28;
+        stepper(x, y, "Бордюр", deg(s.turnSidewalk), () -> s.turnSidewalk = (s.turnSidewalk + 3) % 4,
+                () -> s.turnSidewalk = (s.turnSidewalk + 1) % 4);
+        y += 22;
+        stepper(x, y, "Фонарь", deg(s.turnLamp), () -> s.turnLamp = (s.turnLamp + 3) % 4,
+                () -> s.turnLamp = (s.turnLamp + 1) % 4);
+        y += 22;
+        stepper(x, y, "Торец-уклон", deg(s.turnCap), () -> s.turnCap = (s.turnCap + 3) % 4,
+                () -> s.turnCap = (s.turnCap + 1) % 4);
+        y += 22;
+        stepper(x, y, "Линия", deg(s.turnLine), () -> s.turnLine = (s.turnLine + 3) % 4,
+                () -> s.turnLine = (s.turnLine + 1) % 4);
+        y += 22;
+        stepper(x, y, "Зебра", deg(s.turnCross), () -> s.turnCross = (s.turnCross + 3) % 4,
+                () -> s.turnCross = (s.turnCross + 1) % 4);
+        y += 22;
+        stepper(x, y, "Диагональ (парковка)", deg(s.turnDiag), () -> s.turnDiag = (s.turnDiag + 3) % 4,
+                () -> s.turnDiag = (s.turnDiag + 1) % 4);
+    }
+
+    private static String deg(int turns) {
+        return (turns * 90) + "°";
     }
 
     private Button btn(String text, int x, int y, int w, Runnable action) {
@@ -175,15 +283,15 @@ public class RoadScreen extends Screen {
         labels.add(new Label(x, y, text));
     }
 
-    private void stepper(int x, int y, String text, int value, Runnable dec, Runnable inc) {
+    private void stepper(int x, int y, String text, String valueText, Runnable dec, Runnable inc) {
         label(x, y + 6, text);
-        btn("-", x + 150, y, 20, () -> {
+        btn("-", x + 140, y, 20, () -> {
             dec.run();
             changed();
         });
-        Button v = btn(String.valueOf(value), x + 172, y, 28, () -> {});
+        Button v = btn(valueText, x + 162, y, 36, () -> {});
         v.active = false;
-        btn("+", x + 202, y, 20, () -> {
+        btn("+", x + 200, y, 20, () -> {
             inc.run();
             changed();
         });
@@ -191,6 +299,13 @@ public class RoadScreen extends Screen {
 
     private void toggle(int x, int y, String text, boolean on, Runnable flip) {
         btn((on ? "§a" : "§c") + text, x, y, 114, () -> {
+            flip.run();
+            changed();
+        });
+    }
+
+    private void smallToggle(int x, int y, String text, boolean on, Runnable flip) {
+        btn((on ? "§a" : "§c") + text, x, y, 38, () -> {
             flip.run();
             changed();
         });
@@ -227,31 +342,41 @@ public class RoadScreen extends Screen {
 
         RoadSpec spec = s.toSpec();
         CrossSection cs = CrossSection.build(spec);
-        g.drawString(font, "Ширина профиля: " + cs.width() + " бл.  ·  ЛКМ-тяни: вращать, колесо: масштаб",
+        g.drawString(font, "Профиль: " + cs.width() + " бл.  ·  ЛКМ-тяни: вращать, колесо: масштаб",
                 px1 + 4, py2 + 6, 0xA0A0A0);
     }
 
     private void rebuildPreview() {
-        RoadSpec spec = s.toSpec();
-        CrossSection cs = CrossSection.build(spec);
-        previewLen = spec.lampSpacing() > 0 ? Mth.clamp(spec.lampSpacing() * 2, 16, 40) : 16;
-        previewWidth = cs.width();
-
-        List<Placement> raw = RoadPlan.generate(BlockPos.ZERO, Direction.SOUTH, previewLen, spec, cs,
-                s.toPalette(), 0);
+        List<Placement> raw;
+        if (s.mode == BuildMode.INTERSECTION) {
+            RoadSettings ps = s.copy();
+            ps.armLength = Math.min(ps.armLength, 8);
+            raw = IntersectionPlan.generate(BlockPos.ZERO, ps, 0);
+        } else {
+            RoadSpec spec = s.toSpec();
+            CrossSection cs = CrossSection.build(spec);
+            int len = spec.lampSpacing() > 0 ? Mth.clamp(spec.lampSpacing() * 2, 16, 40) : 16;
+            raw = RoadPlan.generate(BlockPos.ZERO, Direction.SOUTH, len, spec, cs, s.toPalette(), 0);
+        }
 
         int minX = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
         for (Placement p : raw) {
             minX = Math.min(minX, p.pos().getX());
             maxX = Math.max(maxX, p.pos().getX());
+            minZ = Math.min(minZ, p.pos().getZ());
+            maxZ = Math.max(maxZ, p.pos().getZ());
+        }
+        if (raw.isEmpty()) {
+            minX = maxX = minZ = maxZ = 0;
         }
 
-        // фон: газон вокруг дороги
         Map<BlockPos, BlockState> world = new LinkedHashMap<>();
         BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
         for (int x = minX - 4; x <= maxX + 4; x++) {
-            for (int z = -3; z < previewLen + 3; z++) {
+            for (int z = minZ - 3; z <= maxZ + 3; z++) {
                 world.put(new BlockPos(x, 0, z), grass);
             }
         }
@@ -263,9 +388,9 @@ public class RoadScreen extends Screen {
         world.forEach((pos, st) -> cache.add(new Placement(pos, st)));
 
         centerX = (minX + maxX + 1) / 2f;
-        centerZ = previewLen / 2f;
-        float extent = Math.max(maxX - minX + 9, previewLen + 3);
-        baseScale = Math.max(4f, Math.min(px2 - px1, py2 - py1) * 0.9f / extent);
+        centerZ = (minZ + maxZ + 1) / 2f;
+        float extent = Math.max(maxX - minX + 9, maxZ - minZ + 7);
+        baseScale = Math.max(3f, Math.min(px2 - px1, py2 - py1) * 0.9f / extent);
     }
 
     private void renderPreview(GuiGraphics g) {

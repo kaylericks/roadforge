@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** Набор блоков по ролям. На этапе 2 станет редактируемым из меню. */
+/** Блоки по ролям + поправки поворота (в четвертях оборота), чтобы подогнать ориентацию моделей. */
 public record RoadPalette(
         String asphalt,
         String line,
@@ -22,7 +22,15 @@ public record RoadPalette(
         String lamp,
         String capPlain,
         String capSolid,
-        String capDash
+        String capDash,
+        String crosswalk,
+        String diagonal,
+        int turnSidewalk,
+        int turnLamp,
+        int turnCap,
+        int turnLine,
+        int turnCross,
+        int turnDiag
 ) {
     public static final RoadPalette DEFAULT = new RoadPalette(
             "routemod:asphalte",              // низкий асфальт (10/16), как и линии
@@ -32,7 +40,10 @@ public record RoadPalette(
             "routemod:lampe_1",
             "roadmarks:pente_1",
             "roadmarks:pente_1_marquage",
-            "roadmarks:pente_1_pointille"
+            "roadmarks:pente_1_pointille",
+            "routemod:passage_pieton",
+            "routemod:ligne_diagonale",
+            0, 0, 0, 0, 0, 0
     );
 
     private static final Map<String, Optional<Block>> CACHE = new HashMap<>();
@@ -47,5 +58,45 @@ public record RoadPalette(
             return Blocks.STONE.defaultBlockState();
         }
         return StateUtil.withFacing(b.get().defaultBlockState(), facing);
+    }
+
+    public static Direction turn(Direction d, int turns) {
+        Direction r = d;
+        for (int i = 0; i < Math.floorMod(turns, 4); i++) {
+            r = r.getClockWise();
+        }
+        return r;
+    }
+
+    public BlockState asphaltState(Direction f) {
+        return state(asphalt, f);
+    }
+
+    public BlockState lineState(Direction f) {
+        return state(line, turn(f, turnLine));
+    }
+
+    public BlockState sidewalkState(Direction f) {
+        return state(sidewalk, turn(f, turnSidewalk));
+    }
+
+    public BlockState grassState() {
+        return state(grass, Direction.NORTH);
+    }
+
+    public BlockState lampState(Direction f) {
+        return state(lamp, turn(f, turnLamp));
+    }
+
+    public BlockState capState(String id, Direction f) {
+        return state(id, turn(f, turnCap));
+    }
+
+    public BlockState crosswalkState(Direction f) {
+        return state(crosswalk, turn(f, turnCross));
+    }
+
+    public BlockState diagonalState(Direction f) {
+        return state(diagonal, turn(f, turnDiag));
     }
 }

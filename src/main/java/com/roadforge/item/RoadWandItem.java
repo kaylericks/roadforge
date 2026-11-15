@@ -4,6 +4,7 @@ import com.roadforge.RoadConfig;
 import com.roadforge.build.RoadActions;
 import com.roadforge.network.Net;
 import com.roadforge.player.PlayerRoadState;
+import com.roadforge.road.BuildMode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -12,8 +13,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
 
 /**
- * ПКМ по блоку: 1-й раз - начало, 2-й - конец (потом снова начало).
- * Shift+ПКМ - построить дорогу. Настройки - в меню (клавиша K по умолчанию).
+ * Режим «Дорога»: ПКМ - начало, ещё ПКМ - конец. Режим «Перекрёсток»: ПКМ - центр.
+ * Shift+ПКМ - построить. Настройки - в меню (клавиша K по умолчанию).
  */
 public class RoadWandItem extends Item {
     public RoadWandItem(Properties props) {
@@ -41,7 +42,12 @@ public class RoadWandItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
-        if (st.a == null || st.b != null) {
+        if (st.settings.mode == BuildMode.INTERSECTION) {
+            st.a = pos;
+            st.b = null;
+            player.displayClientMessage(Component.literal("§bЦентр перекрёстка: " + pos.toShortString()
+                    + " §7(Shift+ПКМ — построить)"), true);
+        } else if (st.a == null || st.b != null) {
             st.a = pos;
             st.b = null;
             player.displayClientMessage(Component.literal("§bДорога: ПКМ — начало " + pos.toShortString()

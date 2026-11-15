@@ -7,5 +7,8 @@ public enum Kind {
     LINE_DASH,
     SIDEWALK_L,
     SIDEWALK_R,
-    GRASS
+    GRASS,
+    PARK_EDGE,   // колонка парковки рядом с проезжей частью
+    PARK_BAY,    // остальные колонки парковки
+    CROSSWALK    // только в перекрёстках
 }

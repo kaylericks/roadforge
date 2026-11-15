@@ -2,7 +2,7 @@ package com.roadforge.road;
 
 /**
  * Параметры дороги.
- * laneWidth - шаг между линиями разметки в блоках (линия рисуется внутри блока-колонки).
+ * laneWidth - колонок асфальта в одной полосе; между полосами колонка разметки.
  */
 public record RoadSpec(
         String preset,
@@ -17,9 +17,26 @@ public record RoadSpec(
         int lampSpacing,
         int dashOn,
         int dashGap,
-        boolean endCaps
+        boolean endCaps,
+        ParkType parkType,
+        boolean parkLeft,
+        boolean parkRight,
+        int parkDepth,
+        int parkPitch
 ) {
     public int dashPeriod() {
         return Math.max(1, dashOn + dashGap);
+    }
+
+    public RoadSpec withEndCaps(boolean caps) {
+        return new RoadSpec(preset, lanes, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
+                sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, caps,
+                parkType, parkLeft, parkRight, parkDepth, parkPitch);
+    }
+
+    public RoadSpec withLanes(int l) {
+        return new RoadSpec(preset, l, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
+                sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps,
+                parkType, parkLeft, parkRight, parkDepth, parkPitch);
     }
 }

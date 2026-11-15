@@ -11,10 +11,11 @@ import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Все настройки дороги (то, что редактируется в меню). Хранится на клиенте и синхронизируется на сервер. */
+/** Все настройки (то, что редактируется в меню). Хранится на клиенте и синхронизируется на сервер. */
 public class RoadSettings {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
+    // --- дорога ---
     public RoadPreset preset = RoadPreset.CITY;
     public int lanes = 4;
     public int laneWidth = 3;
@@ -29,6 +30,25 @@ public class RoadSettings {
     public boolean doubleCenter = true;
     public boolean endCaps = true;
 
+    // --- парковка ---
+    public ParkType parkType = ParkType.NONE;
+    public boolean parkLeft = false;
+    public boolean parkRight = false;
+    public int parkDepth = 2;
+    public int parkPitch = 6;
+
+    // --- перекрёсток ---
+    public BuildMode mode = BuildMode.ROAD;
+    public int crossLanes = 2;
+    public int armLength = 14;
+    public boolean armN = true;
+    public boolean armE = true;
+    public boolean armS = true;
+    public boolean armW = true;
+    public int cornerRadius = 3;
+    public boolean crosswalks = true;
+
+    // --- блоки ---
     public String asphalt = RoadPalette.DEFAULT.asphalt();
     public String line = RoadPalette.DEFAULT.line();
     public String sidewalk = RoadPalette.DEFAULT.sidewalk();
@@ -37,12 +57,22 @@ public class RoadSettings {
     public String capPlain = RoadPalette.DEFAULT.capPlain();
     public String capSolid = RoadPalette.DEFAULT.capSolid();
     public String capDash = RoadPalette.DEFAULT.capDash();
+    public String crosswalk = RoadPalette.DEFAULT.crosswalk();
+    public String diagonal = RoadPalette.DEFAULT.diagonal();
+
+    // --- повороты моделей (четверти оборота) ---
+    public int turnSidewalk = 0;
+    public int turnLamp = 0;
+    public int turnCap = 0;
+    public int turnLine = 0;
+    public int turnCross = 0;
+    public int turnDiag = 0;
 
     public RoadSettings() {
         applyPreset(RoadPreset.CITY);
     }
 
-    /** Подставляет значения шаблона (блоки не трогает). */
+    /** Подставляет значения шаблона (блоки, парковку и перекрёсток не трогает). */
     public void applyPreset(RoadPreset p) {
         RoadSpec sp = p.create(lanes);
         preset = p;
@@ -62,11 +92,13 @@ public class RoadSettings {
 
     public RoadSpec toSpec() {
         return new RoadSpec(preset.key, lanes, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
-                sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps);
+                sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps,
+                parkType, parkLeft, parkRight, parkDepth, parkPitch);
     }
 
     public RoadPalette toPalette() {
-        return new RoadPalette(asphalt, line, sidewalk, grass, lamp, capPlain, capSolid, capDash);
+        return new RoadPalette(asphalt, line, sidewalk, grass, lamp, capPlain, capSolid, capDash,
+                crosswalk, diagonal, turnSidewalk, turnLamp, turnCap, turnLine, turnCross, turnDiag);
     }
 
     public String get(Role r) {
@@ -76,6 +108,8 @@ public class RoadSettings {
             case SIDEWALK -> sidewalk;
             case GRASS -> grass;
             case LAMP -> lamp;
+            case CROSSWALK -> crosswalk;
+            case DIAGONAL -> diagonal;
         };
     }
 
@@ -86,6 +120,8 @@ public class RoadSettings {
             case SIDEWALK -> sidewalk = id;
             case GRASS -> grass = id;
             case LAMP -> lamp = id;
+            case CROSSWALK -> crosswalk = id;
+            case DIAGONAL -> diagonal = id;
         }
     }
 
@@ -94,14 +130,34 @@ public class RoadSettings {
         if (preset == null) {
             preset = RoadPreset.CITY;
         }
+        if (parkType == null) {
+            parkType = ParkType.NONE;
+        }
+        if (mode == null) {
+            mode = BuildMode.ROAD;
+        }
         lanes = RoadPreset.clampLanes(lanes);
+        crossLanes = RoadPreset.clampLanes(crossLanes);
         laneWidth = clamp(laneWidth, 2, 5);
         medianWidth = clamp(medianWidth, 0, 9);
+        if (medianWidth > 0 && medianWidth % 2 == 0) {
+            medianWidth++;                       // нечётная ширина: симметричный профиль
+        }
         sidewalkWidth = clamp(sidewalkWidth, 0, 8);
         shoulderWidth = clamp(shoulderWidth, 0, 4);
         lampSpacing = lampSpacing <= 0 ? 0 : clamp(lampSpacing, 6, 48);
         dashOn = clamp(dashOn, 1, 4);
         dashGap = clamp(dashGap, 1, 6);
+        parkDepth = clamp(parkDepth, 1, 6);
+        parkPitch = clamp(parkPitch, 2, 10);
+        armLength = clamp(armLength, 4, 48);
+        cornerRadius = clamp(cornerRadius, 0, 8);
+        turnSidewalk = Math.floorMod(turnSidewalk, 4);
+        turnLamp = Math.floorMod(turnLamp, 4);
+        turnCap = Math.floorMod(turnCap, 4);
+        turnLine = Math.floorMod(turnLine, 4);
+        turnCross = Math.floorMod(turnCross, 4);
+        turnDiag = Math.floorMod(turnDiag, 4);
 
         RoadPalette d = RoadPalette.DEFAULT;
         asphalt = fix(asphalt, d.asphalt());
@@ -112,6 +168,8 @@ public class RoadSettings {
         capPlain = fix(capPlain, d.capPlain());
         capSolid = fix(capSolid, d.capSolid());
         capDash = fix(capDash, d.capDash());
+        crosswalk = fix(crosswalk, d.crosswalk());
+        diagonal = fix(diagonal, d.diagonal());
     }
 
     private static int clamp(int v, int lo, int hi) {
@@ -172,6 +230,23 @@ public class RoadSettings {
         b.writeBoolean(edgeLines);
         b.writeBoolean(doubleCenter);
         b.writeBoolean(endCaps);
+
+        b.writeEnum(parkType);
+        b.writeBoolean(parkLeft);
+        b.writeBoolean(parkRight);
+        b.writeVarInt(parkDepth);
+        b.writeVarInt(parkPitch);
+
+        b.writeEnum(mode);
+        b.writeVarInt(crossLanes);
+        b.writeVarInt(armLength);
+        b.writeBoolean(armN);
+        b.writeBoolean(armE);
+        b.writeBoolean(armS);
+        b.writeBoolean(armW);
+        b.writeVarInt(cornerRadius);
+        b.writeBoolean(crosswalks);
+
         b.writeUtf(asphalt);
         b.writeUtf(line);
         b.writeUtf(sidewalk);
@@ -180,6 +255,15 @@ public class RoadSettings {
         b.writeUtf(capPlain);
         b.writeUtf(capSolid);
         b.writeUtf(capDash);
+        b.writeUtf(crosswalk);
+        b.writeUtf(diagonal);
+
+        b.writeVarInt(turnSidewalk);
+        b.writeVarInt(turnLamp);
+        b.writeVarInt(turnCap);
+        b.writeVarInt(turnLine);
+        b.writeVarInt(turnCross);
+        b.writeVarInt(turnDiag);
     }
 
     public static RoadSettings decode(FriendlyByteBuf b) {
@@ -197,6 +281,23 @@ public class RoadSettings {
         s.edgeLines = b.readBoolean();
         s.doubleCenter = b.readBoolean();
         s.endCaps = b.readBoolean();
+
+        s.parkType = b.readEnum(ParkType.class);
+        s.parkLeft = b.readBoolean();
+        s.parkRight = b.readBoolean();
+        s.parkDepth = b.readVarInt();
+        s.parkPitch = b.readVarInt();
+
+        s.mode = b.readEnum(BuildMode.class);
+        s.crossLanes = b.readVarInt();
+        s.armLength = b.readVarInt();
+        s.armN = b.readBoolean();
+        s.armE = b.readBoolean();
+        s.armS = b.readBoolean();
+        s.armW = b.readBoolean();
+        s.cornerRadius = b.readVarInt();
+        s.crosswalks = b.readBoolean();
+
         s.asphalt = b.readUtf();
         s.line = b.readUtf();
         s.sidewalk = b.readUtf();
@@ -205,6 +306,15 @@ public class RoadSettings {
         s.capPlain = b.readUtf();
         s.capSolid = b.readUtf();
         s.capDash = b.readUtf();
+        s.crosswalk = b.readUtf();
+        s.diagonal = b.readUtf();
+
+        s.turnSidewalk = b.readVarInt();
+        s.turnLamp = b.readVarInt();
+        s.turnCap = b.readVarInt();
+        s.turnLine = b.readVarInt();
+        s.turnCross = b.readVarInt();
+        s.turnDiag = b.readVarInt();
         return s;
     }
 }

@@ -22,7 +22,9 @@ public final class BlockCatalog {
                     "minecraft:cobblestone", "minecraft:light_gray_concrete"),
             Role.GRASS, List.of("minecraft:grass_block", "minecraft:moss_block", "minecraft:dirt",
                     "minecraft:coarse_dirt", "minecraft:podzol"),
-            Role.LAMP, List.of("minecraft:end_rod", "minecraft:lantern", "minecraft:sea_lantern", "minecraft:glowstone")
+            Role.LAMP, List.of("minecraft:end_rod", "minecraft:lantern", "minecraft:sea_lantern", "minecraft:glowstone"),
+            Role.CROSSWALK, List.of("minecraft:white_concrete", "minecraft:quartz_block", "minecraft:light_gray_concrete"),
+            Role.DIAGONAL, List.of("minecraft:white_concrete", "minecraft:light_gray_concrete")
     );
 
     public static List<String> mods(Role role) {
@@ -58,6 +60,8 @@ public final class BlockCatalog {
                     || p.startsWith("revetement_");
             case GRASS -> p.equals("trottoir_grass");
             case LAMP -> p.startsWith("lampe_");
+            case CROSSWALK -> p.startsWith("passage_pieton");
+            case DIAGONAL -> p.startsWith("ligne_diagonale");
         };
     }
 

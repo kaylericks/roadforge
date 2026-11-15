@@ -57,7 +57,8 @@ public final class RoadCommands {
             "roadmarks:pente_1",
             "roadmarks:pente_1_marquage",
             "roadmarks:pente_1_pointille",
-            "routemod:passage_pieton"
+            "routemod:passage_pieton",
+            "routemod:ligne_diagonale"
     );
 
     public static void register(CommandDispatcher<CommandSourceStack> d) {
