@@ -4,10 +4,15 @@ import com.roadforge.RoadConfig;
 import com.roadforge.player.PlayerRoadState;
 import com.roadforge.road.BuildMode;
 import com.roadforge.road.CrossSection;
+import com.roadforge.road.BendPlan;
 import com.roadforge.road.IntersectionPlan;
 import com.roadforge.road.Placement;
 import com.roadforge.road.RoadPlan;
+import com.roadforge.road.RoundaboutPlan;
 import com.roadforge.road.RoadSpec;
+import com.roadforge.road.RoadSettings;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -18,6 +23,17 @@ public final class RoadActions {
     public static final int CLEAR_HEIGHT = 3;
 
     public static String describe(PlayerRoadState st) {
+        if (st.settings.mode == BuildMode.CURVE) {
+            return "Изгиб: " + st.settings.lanes + " пол. · радиус дуги " + BendPlan.radius(st.settings)
+                    + " · сначала вдоль " + (st.settings.curveFirstX ? "X" : "Z");
+        }
+        if (st.settings.mode == BuildMode.ROUNDABOUT) {
+            return "Кольцо: остров R" + st.settings.islandRadius + " · полос кольца " + st.settings.ringLanes
+                    + " · ветки " + arms(st);
+        }
+        if (st.settings.mode == BuildMode.INTERSECTION && BendPlan.arms(st.settings) != null) {
+            return "Поворот: " + st.settings.lanes + " пол. · ветки " + arms(st);
+        }
         if (st.settings.mode == BuildMode.INTERSECTION) {
             return "Перекрёсток: главная " + st.settings.lanes + " пол. · поперечная " + st.settings.crossLanes
                     + " пол. · ветки " + arms(st);
@@ -43,6 +59,10 @@ public final class RoadActions {
         st.settings.sanitize();
         if (st.settings.mode == BuildMode.INTERSECTION) {
             buildIntersection(player, st);
+        } else if (st.settings.mode == BuildMode.ROUNDABOUT) {
+            buildRoundabout(player, st);
+        } else if (st.settings.mode == BuildMode.CURVE) {
+            buildCurve(player, st);
         } else {
             buildRoad(player, st);
         }
@@ -93,6 +113,76 @@ public final class RoadActions {
         player.sendSystemMessage(Component.literal("§eСтрою: " + describe(st)));
         player.sendSystemMessage(Component.literal("§7Продолжай дорогу за концами веток, начиная с блоков: "
                 + IntersectionPlan.armEnds(st.a, st.settings)));
+    }
+
+    /** Дорога из точки A в точку B с одним поворотом на 90° (два прямых участка и дуга). */
+    private static void buildCurve(ServerPlayer player, PlayerRoadState st) {
+        if (!st.hasBoth()) {
+            player.sendSystemMessage(Component.literal("§cСначала отметь начало и конец жезлом (ПКМ по блоку)."));
+            return;
+        }
+        RoadSettings cfg = st.settings;
+        BlockPos a = st.a;
+        BlockPos b = st.b;
+        if (a.getX() == b.getX() || a.getZ() == b.getZ()) {
+            player.sendSystemMessage(Component.literal(
+                    "§cТочки лежат на одной линии: для прямой дороги используй режим «Дорога»."));
+            return;
+        }
+        BlockPos corner;
+        Direction d1;
+        Direction d2;
+        int dist1;
+        int dist2;
+        if (cfg.curveFirstX) {
+            corner = new BlockPos(b.getX(), a.getY(), a.getZ());
+            d1 = a.getX() > b.getX() ? Direction.EAST : Direction.WEST;
+            d2 = b.getZ() > a.getZ() ? Direction.SOUTH : Direction.NORTH;
+            dist1 = Math.abs(a.getX() - b.getX());
+            dist2 = Math.abs(b.getZ() - a.getZ());
+        } else {
+            corner = new BlockPos(a.getX(), a.getY(), b.getZ());
+            d1 = a.getZ() > b.getZ() ? Direction.SOUTH : Direction.NORTH;
+            d2 = b.getX() > a.getX() ? Direction.EAST : Direction.WEST;
+            dist1 = Math.abs(a.getZ() - b.getZ());
+            dist2 = Math.abs(b.getX() - a.getX());
+        }
+        int rho = BendPlan.radius(cfg);
+        if (dist1 < rho || dist2 < rho) {
+            player.sendSystemMessage(Component.literal("§cУчастки слишком короткие для поворота: каждый должен быть не короче "
+                    + rho + " бл. (сейчас " + dist1 + " и " + dist2 + "). Отодвинь точки или уменьши «Радиус углов»."));
+            return;
+        }
+        List<Placement> plan = BendPlan.generate(corner, d1, d2, dist1, dist2, false, cfg, CLEAR_HEIGHT);
+        if (plan.size() > RoadConfig.MAX_BLOCKS_PER_BUILD.get()) {
+            player.sendSystemMessage(Component.literal("§cСлишком много блоков (" + plan.size()
+                    + "), лимит " + RoadConfig.MAX_BLOCKS_PER_BUILD.get() + "."));
+            return;
+        }
+        BuildManager.enqueue(player.serverLevel(), player.getUUID(), plan, true, "Изгиб построен");
+        player.sendSystemMessage(Component.literal("§eСтрою: " + describe(st)));
+    }
+
+    private static void buildRoundabout(ServerPlayer player, PlayerRoadState st) {
+        if (st.a == null) {
+            player.sendSystemMessage(Component.literal("§cСначала отметь центр кольца жезлом (ПКМ по блоку)."));
+            return;
+        }
+        if (!(st.settings.armN || st.settings.armE || st.settings.armS || st.settings.armW)) {
+            player.sendSystemMessage(Component.literal("§cВключи хотя бы одну ветку кольца."));
+            return;
+        }
+        long estimate = (long) RoundaboutPlan.footprint(st.settings) * (2 + CLEAR_HEIGHT);
+        if (estimate > RoadConfig.MAX_BLOCKS_PER_BUILD.get()) {
+            player.sendSystemMessage(Component.literal("§cСлишком много блоков (~" + estimate
+                    + "), лимит " + RoadConfig.MAX_BLOCKS_PER_BUILD.get() + "."));
+            return;
+        }
+        List<Placement> plan = RoundaboutPlan.generate(st.a, st.settings, CLEAR_HEIGHT);
+        BuildManager.enqueue(player.serverLevel(), player.getUUID(), plan, true, "Кольцо построено");
+        player.sendSystemMessage(Component.literal("§eСтрою: " + describe(st)));
+        player.sendSystemMessage(Component.literal("§7Продолжай дорогу за концами веток, начиная с блоков: "
+                + RoundaboutPlan.armEnds(st.a, st.settings)));
     }
 
     private RoadActions() {}

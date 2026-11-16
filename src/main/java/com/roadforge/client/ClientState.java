@@ -3,7 +3,6 @@ package com.roadforge.client;
 import com.roadforge.network.ApplySettingsPacket;
 import com.roadforge.network.Net;
 import com.roadforge.player.PlayerRoadState;
-import com.roadforge.road.BuildMode;
 import com.roadforge.road.RoadSettings;
 import net.minecraft.core.BlockPos;
 
@@ -34,7 +33,7 @@ public final class ClientState {
     }
 
     public static String pointsText() {
-        if (settings().mode == BuildMode.INTERSECTION) {
+        if (settings().mode.isCentered()) {
             return a == null ? "Центр не выбран: ПКМ жезлом по блоку" : "Центр: " + a.toShortString();
         }
         if (a == null) {

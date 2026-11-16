@@ -4,7 +4,6 @@ import com.roadforge.RoadConfig;
 import com.roadforge.build.RoadActions;
 import com.roadforge.network.Net;
 import com.roadforge.player.PlayerRoadState;
-import com.roadforge.road.BuildMode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -42,10 +41,10 @@ public class RoadWandItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
-        if (st.settings.mode == BuildMode.INTERSECTION) {
+        if (st.settings.mode.isCentered()) {
             st.a = pos;
             st.b = null;
-            player.displayClientMessage(Component.literal("§bЦентр перекрёстка: " + pos.toShortString()
+            player.displayClientMessage(Component.literal("§bЦентр: " + pos.toShortString()
                     + " §7(Shift+ПКМ — построить)"), true);
         } else if (st.a == null || st.b != null) {
             st.a = pos;

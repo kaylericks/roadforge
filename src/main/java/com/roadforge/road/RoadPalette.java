@@ -13,11 +13,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** Блоки по ролям + поправки поворота (в четвертях оборота), чтобы подогнать ориентацию моделей. */
+/** Блоки по ролям (бордюр - отдельная роль) + поправки поворота (в четвертях оборота), чтобы подогнать ориентацию моделей. */
 public record RoadPalette(
         String asphalt,
         String line,
         String sidewalk,
+        String curb,
         String grass,
         String lamp,
         String capPlain,
@@ -35,7 +36,8 @@ public record RoadPalette(
     public static final RoadPalette DEFAULT = new RoadPalette(
             "routemod:asphalte",              // низкий асфальт (10/16), как и линии
             "routemod:ligne_continue",
-            "routemod:trottoir_stone_brick",
+            "minecraft:stone_bricks",         // тротуар: обычные блоки
+            "routemod:trottoir_stone_brick",  // бордюр: один ряд у проезжей части
             "minecraft:grass_block",
             "routemod:lampe_1",
             "roadmarks:pente_1",
@@ -76,8 +78,14 @@ public record RoadPalette(
         return state(line, turn(f, turnLine));
     }
 
+    /** Покрытие тротуара (f - направление в сторону проезжей части). */
     public BlockState sidewalkState(Direction f) {
         return state(sidewalk, turn(f, turnSidewalk));
+    }
+
+    /** Бордюр: один блок у кромки (f - направление в сторону проезжей части). */
+    public BlockState curbState(Direction f) {
+        return state(curb, turn(f, turnSidewalk));
     }
 
     public BlockState grassState() {

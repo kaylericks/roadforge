@@ -20,6 +20,8 @@ public final class BlockCatalog {
             Role.SIDEWALK, List.of("minecraft:stone_bricks", "minecraft:smooth_stone", "minecraft:polished_andesite",
                     "minecraft:quartz_block", "minecraft:bricks", "minecraft:smooth_sandstone",
                     "minecraft:cobblestone", "minecraft:light_gray_concrete"),
+            Role.CURB, List.of("minecraft:polished_andesite", "minecraft:smooth_stone", "minecraft:stone_bricks",
+                    "minecraft:quartz_block", "minecraft:light_gray_concrete", "minecraft:bricks"),
             Role.GRASS, List.of("minecraft:grass_block", "minecraft:moss_block", "minecraft:dirt",
                     "minecraft:coarse_dirt", "minecraft:podzol"),
             Role.LAMP, List.of("minecraft:end_rod", "minecraft:lantern", "minecraft:sea_lantern", "minecraft:glowstone"),
@@ -58,6 +60,7 @@ public final class BlockCatalog {
             case LINE -> p.equals("ligne_continue");
             case SIDEWALK -> p.matches("trottoir_(stone|stone_brick|brick|sandstone|smooth_stone|grass)")
                     || p.startsWith("revetement_");
+            case CURB -> p.matches("trottoir_(stone|stone_brick|brick|sandstone|smooth_stone)");
             case GRASS -> p.equals("trottoir_grass");
             case LAMP -> p.startsWith("lampe_");
             case CROSSWALK -> p.startsWith("passage_pieton");

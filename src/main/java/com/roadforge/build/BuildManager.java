@@ -51,7 +51,9 @@ public final class BuildManager {
     }
 
     public static void enqueue(ServerLevel level, UUID owner, List<Placement> list, boolean record, String label) {
-        QUEUE.add(new Job(level, owner, list, record, label));
+        // record == true только у настоящих построек; отмена (record == false) подложку не добавляет
+        List<Placement> full = record ? Foundation.withBase(level, list) : list;
+        QUEUE.add(new Job(level, owner, full, record, label));
     }
 
     public static boolean undo(ServerPlayer player) {

@@ -5,6 +5,7 @@ public enum Role {
     ASPHALT("Асфальт"),
     LINE("Разметка"),
     SIDEWALK("Тротуар"),
+    CURB("Бордюр"),
     GRASS("Газон"),
     LAMP("Фонарь"),
     CROSSWALK("Зебра"),

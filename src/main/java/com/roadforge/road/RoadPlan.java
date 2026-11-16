@@ -10,6 +10,8 @@ import java.util.List;
 
 /** Превращает параметры дороги в список блоков (прямой участок вдоль оси). */
 public final class RoadPlan {
+    /** Глубина (вдоль дороги) пешеходного перехода. */
+    public static final int CROSSWALK_DEPTH = 3;
 
     public static List<Placement> generate(BlockPos start, Direction dir, int length, RoadSpec spec,
                                            CrossSection cs, RoadPalette pal, int clearHeight) {
@@ -28,16 +30,24 @@ public final class RoadPlan {
             }
         }
 
-        // 2. поверхность
+        // 2. клетки поверхности
+        Surfaces.Cell[][] g = new Surfaces.Cell[length][w];
         for (int s = 0; s < length; s++) {
             for (int i = 0; i < w; i++) {
-                BlockPos pos = at(start, dir, right, s, i - cs.ref());
-                out.add(new Placement(pos, surfaceState(cs.cols().get(i), cs.depths().get(i), i < cs.ref(),
-                        s, length, dir, right, spec, pal)));
+                g[s][i] = cell(cs, i, s, length, dir, right, spec, pal);
+            }
+        }
+        addCrosswalks(g, cs, length, dir, right, spec, pal);
+        Surfaces.resolve(g, dir, right);
+
+        // 3. поверхность
+        for (int s = 0; s < length; s++) {
+            for (int i = 0; i < w; i++) {
+                out.add(new Placement(at(start, dir, right, s, i - cs.ref()), Surfaces.finish(g[s][i], pal)));
             }
         }
 
-        // 3. фонари (на крайних колонках тротуара, в шахматном порядке)
+        // 4. фонари (на крайних колонках тротуара, в шахматном порядке)
         if (spec.lampSpacing() > 0 && cs.lampLeft() >= 0) {
             int sp = spec.lampSpacing();
             int half = sp / 2;
@@ -59,6 +69,68 @@ public final class RoadPlan {
         return start.relative(dir, along).relative(right, lateral);
     }
 
+    private static boolean isParking(Kind k) {
+        return k == Kind.PARK_EDGE || k == Kind.PARK_BAY;
+    }
+
+    /** Колонка парковки у торца превращается в тротуар по диагонали (въезд «косым срезом»). */
+    private static boolean parkTapered(int depth, int s, int length) {
+        return s < depth + 1 || s > length - 2 - depth;
+    }
+
+    private static Surfaces.Cell cell(CrossSection cs, int i, int s, int length, Direction dir, Direction right,
+                                      RoadSpec spec, RoadPalette pal) {
+        Kind k = cs.cols().get(i);
+        int depth = cs.depths().get(i);
+        boolean leftSide = i < cs.ref();
+        Direction towardRoad = leftSide ? right : right.getOpposite();
+        if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
+            return Surfaces.Cell.paving(k == Kind.SIDEWALK_L ? right : right.getOpposite());
+        }
+        if (isParking(k) && parkTapered(depth, s, length)) {
+            return Surfaces.Cell.paving(towardRoad);
+        }
+        return Surfaces.Cell.road(k, surfaceState(k, depth, leftSide, s, length, dir, right, spec, pal));
+    }
+
+    /** Пешеходные переходы посреди дороги: зебра, стоп-линии, пониженный бордюр, «островок» на разделителе. */
+    private static void addCrosswalks(Surfaces.Cell[][] g, CrossSection cs, int length, Direction dir,
+                                      Direction right, RoadSpec spec, RoadPalette pal) {
+        int every = spec.crossEvery();
+        if (every <= 0) {
+            return;
+        }
+        for (int c0 = every / 2; c0 + CROSSWALK_DEPTH + 1 < length - 1; c0 += every) {
+            if (c0 < 2) {
+                continue;
+            }
+            for (int s = c0; s < c0 + CROSSWALK_DEPTH; s++) {
+                for (int i = cs.roadFirst(); i <= cs.roadLast(); i++) {
+                    Kind k = g[s][i].kind;
+                    if (Surfaces.isRoad(k)) {
+                        g[s][i] = Surfaces.Cell.road(Kind.CROSSWALK, pal.crosswalkState(dir));
+                    } else if (k == Kind.GRASS) {
+                        g[s][i] = Surfaces.Cell.paving(i < cs.ref() ? right : right.getOpposite());
+                    }
+                }
+            }
+            // стоп-линии: на своей стороне перед зеброй
+            for (int i = cs.ref() + 1; i <= cs.roadLast(); i++) {
+                stopLine(g, c0 - 1, i, right, pal);
+            }
+            for (int i = cs.roadFirst(); i < cs.ref(); i++) {
+                stopLine(g, c0 + CROSSWALK_DEPTH, i, right, pal);
+            }
+        }
+    }
+
+    private static void stopLine(Surfaces.Cell[][] g, int s, int i, Direction right, RoadPalette pal) {
+        if (s < 0 || s >= g.length || g[s][i].kind != Kind.ASPHALT) {
+            return;
+        }
+        g[s][i] = Surfaces.Cell.road(Kind.LINE_SOLID, pal.lineState(right));
+    }
+
     /**
      * Блок для колонки профиля.
      * s - позиция вдоль дороги, depth - глубина колонки парковки, leftSide - колонка слева от оси.
@@ -78,25 +150,37 @@ public final class RoadPlan {
             case SIDEWALK_R -> pal.sidewalkState(right.getOpposite());
             case GRASS -> pal.grassState();
             case PARK_EDGE, PARK_BAY -> cap ? pal.capState(pal.capPlain(), capFacing)
-                    : parkingState(k, depth, leftSide, s, dir, right, spec, pal);
+                    : parkingState(k, depth, leftSide, s, length, dir, right, spec, pal);
             default -> pal.asphaltState(dir);
         };
     }
 
-    private static BlockState parkingState(Kind k, int depth, boolean leftSide, int s,
+    /**
+     * Разметка парковки. Места считаются от начала полной глубины (после косого среза у торца),
+     * последняя линия замыкает последнее целое место.
+     */
+    private static BlockState parkingState(Kind k, int depth, boolean leftSide, int s, int length,
                                            Direction dir, Direction right, RoadSpec spec, RoadPalette pal) {
+        int pd = Math.max(1, spec.parkDepth());
         int pitch = Math.max(2, spec.parkPitch());
+        int first = pd;
+        int last = length - 1 - pd;
+        int stalls = Math.max(0, last - first) / pitch;
+        int sp = s - first;
+        boolean boundary = sp >= 0 && sp <= stalls * pitch && sp % pitch == 0;
         switch (spec.parkType()) {
             case PARALLEL:
-                // сплошная линия вдоль, отделяющая парковку от полосы
-                return k == Kind.PARK_EDGE ? pal.lineState(dir) : pal.asphaltState(dir);
+                // сплошная линия вдоль, отделяющая парковку от полосы, и короткие поперечные границы мест
+                if (k == Kind.PARK_EDGE) {
+                    return pal.lineState(dir);
+                }
+                return boundary ? pal.lineState(right) : pal.asphaltState(dir);
             case PERPENDICULAR:
-                // разделители мест поперёк дороги
-                return (Math.floorMod(s, pitch) == 0) ? pal.lineState(right) : pal.asphaltState(dir);
+                return boundary ? pal.lineState(right) : pal.asphaltState(dir);
             case ANGLED: {
                 // диагональные линии: со сдвигом на 1 ряд на каждую колонку вглубь
                 int shift = leftSide ? -depth : depth;
-                boolean on = Math.floorMod(s - shift, pitch) == 0;
+                boolean on = Math.floorMod(sp - shift, pitch) == 0;
                 Direction f = leftSide ? right : dir;      // зеркально для другой стороны
                 return on ? pal.diagonalState(f) : pal.asphaltState(dir);
             }

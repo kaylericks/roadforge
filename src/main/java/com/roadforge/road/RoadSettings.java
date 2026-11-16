@@ -7,7 +7,6 @@ import com.roadforge.compat.BlockLookup;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.fml.loading.FMLPaths;
 
-import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -37,6 +36,9 @@ public class RoadSettings {
     public int parkDepth = 2;
     public int parkPitch = 6;
 
+    // --- переходы на дороге ---
+    public int crossEvery = 0;          // шаг пешеходных переходов, блоков (0 - нет)
+
     // --- перекрёсток ---
     public BuildMode mode = BuildMode.ROAD;
     public int crossLanes = 2;
@@ -48,10 +50,18 @@ public class RoadSettings {
     public int cornerRadius = 3;
     public boolean crosswalks = true;
 
+    // --- кольцо ---
+    public int islandRadius = 6;        // радиус центрального острова
+    public int ringLanes = 2;           // полос на кольце (1 или 2)
+
+    // --- изгиб (поворот между двумя точками) ---
+    public boolean curveFirstX = true;  // первый участок от точки A идёт вдоль X (иначе вдоль Z)
+
     // --- блоки ---
     public String asphalt = RoadPalette.DEFAULT.asphalt();
     public String line = RoadPalette.DEFAULT.line();
     public String sidewalk = RoadPalette.DEFAULT.sidewalk();
+    public String curb = RoadPalette.DEFAULT.curb();
     public String grass = RoadPalette.DEFAULT.grass();
     public String lamp = RoadPalette.DEFAULT.lamp();
     public String capPlain = RoadPalette.DEFAULT.capPlain();
@@ -93,11 +103,11 @@ public class RoadSettings {
     public RoadSpec toSpec() {
         return new RoadSpec(preset.key, lanes, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
                 sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps,
-                parkType, parkLeft, parkRight, parkDepth, parkPitch);
+                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery);
     }
 
     public RoadPalette toPalette() {
-        return new RoadPalette(asphalt, line, sidewalk, grass, lamp, capPlain, capSolid, capDash,
+        return new RoadPalette(asphalt, line, sidewalk, curb, grass, lamp, capPlain, capSolid, capDash,
                 crosswalk, diagonal, turnSidewalk, turnLamp, turnCap, turnLine, turnCross, turnDiag);
     }
 
@@ -106,6 +116,7 @@ public class RoadSettings {
             case ASPHALT -> asphalt;
             case LINE -> line;
             case SIDEWALK -> sidewalk;
+            case CURB -> curb;
             case GRASS -> grass;
             case LAMP -> lamp;
             case CROSSWALK -> crosswalk;
@@ -118,6 +129,7 @@ public class RoadSettings {
             case ASPHALT -> asphalt = id;
             case LINE -> line = id;
             case SIDEWALK -> sidewalk = id;
+            case CURB -> curb = id;
             case GRASS -> grass = id;
             case LAMP -> lamp = id;
             case CROSSWALK -> crosswalk = id;
@@ -150,6 +162,9 @@ public class RoadSettings {
         dashGap = clamp(dashGap, 1, 6);
         parkDepth = clamp(parkDepth, 1, 6);
         parkPitch = clamp(parkPitch, 2, 10);
+        crossEvery = crossEvery <= 0 ? 0 : clamp(crossEvery, 16, 128);
+        islandRadius = clamp(islandRadius, 3, 14);
+        ringLanes = clamp(ringLanes, 1, 2);
         armLength = clamp(armLength, 4, 48);
         cornerRadius = clamp(cornerRadius, 0, 8);
         turnSidewalk = Math.floorMod(turnSidewalk, 4);
@@ -163,6 +178,7 @@ public class RoadSettings {
         asphalt = fix(asphalt, d.asphalt());
         line = fix(line, d.line());
         sidewalk = fix(sidewalk, d.sidewalk());
+        curb = fix(curb, d.curb());
         grass = fix(grass, d.grass());
         lamp = fix(lamp, d.lamp());
         capPlain = fix(capPlain, d.capPlain());
@@ -193,9 +209,14 @@ public class RoadSettings {
     public static RoadSettings load() {
         Path p = file();
         if (Files.exists(p)) {
-            try (Reader r = Files.newBufferedReader(p)) {
-                RoadSettings s = GSON.fromJson(r, RoadSettings.class);
+            try {
+                String text = Files.readString(p);
+                RoadSettings s = GSON.fromJson(text, RoadSettings.class);
                 if (s != null) {
+                    // старый конфиг (до роли «Бордюр»): тротуар целиком был бордюрным блоком
+                    if (!text.contains("\"curb\"") && RoadPalette.DEFAULT.curb().equals(s.sidewalk)) {
+                        s.sidewalk = RoadPalette.DEFAULT.sidewalk();
+                    }
                     s.sanitize();
                     return s;
                 }
@@ -236,6 +257,7 @@ public class RoadSettings {
         b.writeBoolean(parkRight);
         b.writeVarInt(parkDepth);
         b.writeVarInt(parkPitch);
+        b.writeVarInt(crossEvery);
 
         b.writeEnum(mode);
         b.writeVarInt(crossLanes);
@@ -246,10 +268,14 @@ public class RoadSettings {
         b.writeBoolean(armW);
         b.writeVarInt(cornerRadius);
         b.writeBoolean(crosswalks);
+        b.writeVarInt(islandRadius);
+        b.writeVarInt(ringLanes);
+        b.writeBoolean(curveFirstX);
 
         b.writeUtf(asphalt);
         b.writeUtf(line);
         b.writeUtf(sidewalk);
+        b.writeUtf(curb);
         b.writeUtf(grass);
         b.writeUtf(lamp);
         b.writeUtf(capPlain);
@@ -287,6 +313,7 @@ public class RoadSettings {
         s.parkRight = b.readBoolean();
         s.parkDepth = b.readVarInt();
         s.parkPitch = b.readVarInt();
+        s.crossEvery = b.readVarInt();
 
         s.mode = b.readEnum(BuildMode.class);
         s.crossLanes = b.readVarInt();
@@ -297,10 +324,14 @@ public class RoadSettings {
         s.armW = b.readBoolean();
         s.cornerRadius = b.readVarInt();
         s.crosswalks = b.readBoolean();
+        s.islandRadius = b.readVarInt();
+        s.ringLanes = b.readVarInt();
+        s.curveFirstX = b.readBoolean();
 
         s.asphalt = b.readUtf();
         s.line = b.readUtf();
         s.sidewalk = b.readUtf();
+        s.curb = b.readUtf();
         s.grass = b.readUtf();
         s.lamp = b.readUtf();
         s.capPlain = b.readUtf();
