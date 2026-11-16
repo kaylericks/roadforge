@@ -20,6 +20,7 @@ public final class IntersectionPlan {
         Kind kind;
         BlockState state;
         Direction face;
+        boolean curb;
 
         C(Kind kind, BlockState state, Direction face) {
             this.kind = kind;
@@ -58,6 +59,9 @@ public final class IntersectionPlan {
     }
 
     public static List<Placement> generate(BlockPos center, RoadSettings st, int clearHeight) {
+        if (BendPlan.arms(st) != null) {
+            return BendPlan.generate(center, st, clearHeight);   // две соседние ветки = поворот
+        }
         Geo g = new Geo(center, st);
         RoadPalette pal = st.toPalette();
         int len = st.armLength;
@@ -208,13 +212,26 @@ public final class IntersectionPlan {
                 if (c == null || c.kind != Kind.SIDEWALK_L) {
                     continue;
                 }
+                Direction toRoad = null;
+                boolean ramp = false;
                 for (Direction d : order) {
                     C n = get(grid, x0, z0, x + d.getStepX(), z + d.getStepZ());
-                    if (n != null && isRoadKind(n.kind)) {
-                        c.face = d;
-                        break;
+                    if (n == null) {
+                        continue;
+                    }
+                    if (n.kind == Kind.CROSSWALK) {
+                        ramp = true;                       // у зебры бордюр убираем (съезд)
+                        if (toRoad == null) {
+                            toRoad = d;
+                        }
+                    } else if (isRoadKind(n.kind) && toRoad == null) {
+                        toRoad = d;
                     }
                 }
+                if (toRoad != null) {
+                    c.face = toRoad;
+                }
+                c.curb = toRoad != null && !ramp;
             }
         }
 
@@ -237,7 +254,10 @@ public final class IntersectionPlan {
                 if (c == null) {
                     continue;
                 }
-                BlockState bs = c.kind == Kind.SIDEWALK_L ? pal.sidewalkState(c.face) : c.state;
+                BlockState bs = c.state;
+                if (c.kind == Kind.SIDEWALK_L) {
+                    bs = c.curb ? pal.curbState(c.face) : pal.sidewalkState(c.face);
+                }
                 out.add(new Placement(new BlockPos(x, g.cy, z), bs));
             }
         }
@@ -273,6 +293,9 @@ public final class IntersectionPlan {
 
     /** Координаты блоков, с которых можно продолжать дорогу за концом каждой ветки. */
     public static String armEnds(BlockPos center, RoadSettings st) {
+        if (BendPlan.arms(st) != null) {
+            return BendPlan.armEnds(center, st);
+        }
         Geo g = new Geo(center, st);
         int len = st.armLength;
         StringBuilder sb = new StringBuilder();

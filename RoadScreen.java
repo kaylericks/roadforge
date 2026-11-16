@@ -7,6 +7,7 @@ import com.mojang.math.Axis;
 import com.roadforge.compat.BlockLookup;
 import com.roadforge.network.ActionPacket;
 import com.roadforge.network.Net;
+import com.roadforge.road.BendPlan;
 import com.roadforge.road.BuildMode;
 import com.roadforge.road.CrossSection;
 import com.roadforge.road.IntersectionPlan;
@@ -16,6 +17,7 @@ import com.roadforge.road.RoadPlan;
 import com.roadforge.road.RoadPreset;
 import com.roadforge.road.RoadSettings;
 import com.roadforge.road.RoadSpec;
+import com.roadforge.road.RoundaboutPlan;
 import com.roadforge.road.Role;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -132,19 +134,19 @@ public class RoadScreen extends Screen {
         stepper(x, y, "Ширина полосы", String.valueOf(s.laneWidth),
                 () -> s.laneWidth = Math.max(2, s.laneWidth - 1),
                 () -> s.laneWidth = Math.min(5, s.laneWidth + 1));
-        y += 22;
+        y += 20;
         stepper(x, y, "Тротуар", String.valueOf(s.sidewalkWidth),
                 () -> s.sidewalkWidth = Math.max(0, s.sidewalkWidth - 1),
                 () -> s.sidewalkWidth = Math.min(8, s.sidewalkWidth + 1));
-        y += 22;
+        y += 20;
         stepper(x, y, "Разделитель (нечёт.)", String.valueOf(s.medianWidth),
                 () -> s.medianWidth = s.medianWidth <= 1 ? 0 : s.medianWidth - 2,
                 () -> s.medianWidth = s.medianWidth == 0 ? 1 : Math.min(9, s.medianWidth + 2));
-        y += 22;
+        y += 20;
         stepper(x, y, "Обочина (газон)", String.valueOf(s.shoulderWidth),
                 () -> s.shoulderWidth = Math.max(0, s.shoulderWidth - 1),
                 () -> s.shoulderWidth = Math.min(4, s.shoulderWidth + 1));
-        y += 22;
+        y += 20;
         stepper(x, y, "Шаг фонарей (0=нет)", String.valueOf(s.lampSpacing),
                 () -> s.lampSpacing = s.lampSpacing <= 6 ? 0 : s.lampSpacing - 2,
                 () -> s.lampSpacing = s.lampSpacing == 0 ? 6 : Math.min(48, s.lampSpacing + 2));
@@ -152,9 +154,17 @@ public class RoadScreen extends Screen {
         y += 26;
         toggle(x, y, "Разметка", s.markings, () -> s.markings = !s.markings);
         toggle(x + 118, y, "Двойная осевая", s.doubleCenter, () -> s.doubleCenter = !s.doubleCenter);
-        y += 22;
+        y += 20;
         toggle(x, y, "Краевые линии", s.edgeLines, () -> s.edgeLines = !s.edgeLines);
         toggle(x + 118, y, "Торцы-уклоны", s.endCaps, () -> s.endCaps = !s.endCaps);
+        y += 20;
+        stepper(x, y, "Переход каждые (0=нет)", String.valueOf(s.crossEvery),
+                () -> s.crossEvery = s.crossEvery <= 16 ? 0 : s.crossEvery - 8,
+                () -> s.crossEvery = s.crossEvery == 0 ? 24 : Math.min(128, s.crossEvery + 8));
+        y += 20;
+        stepper(x, y, "Деревья, шаг (0=нет)", String.valueOf(s.treeSpacing),
+                () -> s.treeSpacing = s.treeSpacing <= 5 ? 0 : s.treeSpacing - 1,
+                () -> s.treeSpacing = s.treeSpacing == 0 ? 8 : Math.min(32, s.treeSpacing + 1));
     }
 
     private void initBlocksTab(int x, int y) {
@@ -169,7 +179,7 @@ public class RoadScreen extends Screen {
                         changed();
                     })));
             icons.add(new Icon(x + 204, y + 2, id));
-            y += 24;
+            y += 22;
         }
         label(x, y + 4, "Клик по кнопке: список блоков (моды / обычные).");
     }
@@ -208,15 +218,15 @@ public class RoadScreen extends Screen {
     }
 
     private void initCrossTab(int x, int y) {
-        btn((s.mode == BuildMode.ROAD ? "§e" : "") + "Режим: дорога", x, y, 114, () -> {
-            s.mode = BuildMode.ROAD;
-            changed();
-        });
-        btn((s.mode == BuildMode.INTERSECTION ? "§e" : "") + "Режим: перекр.", x + 118, y, 114, () -> {
-            s.mode = BuildMode.INTERSECTION;
-            changed();
-        });
+        modeBtn("Дорога", BuildMode.ROAD, x, y, 54);
+        modeBtn("Перекр.", BuildMode.INTERSECTION, x + 58, y, 54);
+        modeBtn("Кольцо", BuildMode.ROUNDABOUT, x + 116, y, 54);
+        modeBtn("Изгиб", BuildMode.CURVE, x + 174, y, 54);
         y += 26;
+        if (s.mode == BuildMode.CURVE) {
+            initCurveTab(x, y);
+            return;
+        }
         label(x, y + 6, "Поперечная:");
         for (int i = 0; i < 3; i++) {
             final int lanes = 2 + i * 2;
@@ -236,15 +246,50 @@ public class RoadScreen extends Screen {
                 () -> s.armLength = Math.max(4, s.armLength - 2),
                 () -> s.armLength = Math.min(48, s.armLength + 2));
         y += 22;
-        stepper(x, y, "Радиус углов", String.valueOf(s.cornerRadius),
-                () -> s.cornerRadius = Math.max(0, s.cornerRadius - 1),
-                () -> s.cornerRadius = Math.min(8, s.cornerRadius + 1));
+        if (s.mode == BuildMode.ROUNDABOUT) {
+            stepper(x, y, "Радиус острова", String.valueOf(s.islandRadius),
+                    () -> s.islandRadius = Math.max(3, s.islandRadius - 1),
+                    () -> s.islandRadius = Math.min(14, s.islandRadius + 1));
+            y += 22;
+            stepper(x, y, "Полос на кольце", String.valueOf(s.ringLanes),
+                    () -> s.ringLanes = Math.max(1, s.ringLanes - 1),
+                    () -> s.ringLanes = Math.min(2, s.ringLanes + 1));
+        } else {
+            stepper(x, y, "Радиус углов", String.valueOf(s.cornerRadius),
+                    () -> s.cornerRadius = Math.max(0, s.cornerRadius - 1),
+                    () -> s.cornerRadius = Math.min(8, s.cornerRadius + 1));
+        }
         y += 26;
         toggle(x, y, "Зебры и стоп-линии", s.crosswalks, () -> s.crosswalks = !s.crosswalks);
         y += 28;
         label(x, y, "Главная дорога = настройки вкладки «Дорога».");
         label(x, y + 12, "Центр ставится одним ПКМ жезла,");
-        label(x, y + 24, "Shift+ПКМ строит. Две соседние ветки = поворот.");
+        label(x, y + 24, "Shift+ПКМ строит.");
+        if (s.mode == BuildMode.ROUNDABOUT) {
+            label(x, y + 36, "Кольцо: до 4 веток, вокруг - площадка.");
+        } else {
+            label(x, y + 36, "Две соседние ветки = поворот по дуге.");
+        }
+    }
+
+    private void initCurveTab(int x, int y) {
+        stepper(x, y, "Радиус дуги", String.valueOf(s.cornerRadius),
+                () -> s.cornerRadius = Math.max(0, s.cornerRadius - 1),
+                () -> s.cornerRadius = Math.min(8, s.cornerRadius + 1));
+        y += 26;
+        toggle(x, y, s.curveFirstX ? "От A: вдоль X" : "От A: вдоль Z", true, () -> s.curveFirstX = !s.curveFirstX);
+        y += 30;
+        label(x, y, "Отметь жезлом точки A и B (ПКМ, ПКМ),");
+        label(x, y + 12, "Shift+ПКМ строит. Дорога идёт от A прямо,");
+        label(x, y + 24, "поворачивает на 90° дугой и идёт к B.");
+        label(x, y + 36, "Ширина - по вкладке «Дорога».");
+    }
+
+    private void modeBtn(String text, BuildMode mode, int x, int y, int w) {
+        btn((s.mode == mode ? "§e" : "") + text, x, y, w, () -> {
+            s.mode = mode;
+            changed();
+        });
     }
 
     private void initTurnTab(int x, int y) {
@@ -352,10 +397,21 @@ public class RoadScreen extends Screen {
             RoadSettings ps = s.copy();
             ps.armLength = Math.min(ps.armLength, 8);
             raw = IntersectionPlan.generate(BlockPos.ZERO, ps, 0);
+        } else if (s.mode == BuildMode.ROUNDABOUT) {
+            RoadSettings ps = s.copy();
+            ps.armLength = Math.min(ps.armLength, 8);
+            raw = RoundaboutPlan.generate(BlockPos.ZERO, ps, 0);
+        } else if (s.mode == BuildMode.CURVE) {
+            RoadSettings ps = s.copy();
+            int end = BendPlan.radius(ps) + 8;
+            raw = BendPlan.generate(BlockPos.ZERO, Direction.WEST, Direction.SOUTH, end, end, false, ps, 0);
         } else {
             RoadSpec spec = s.toSpec();
             CrossSection cs = CrossSection.build(spec);
             int len = spec.lampSpacing() > 0 ? Mth.clamp(spec.lampSpacing() * 2, 16, 40) : 16;
+            if (spec.crossEvery() > 0) {
+                len = Math.max(len, Math.min(72, spec.crossEvery() / 2 + RoadPlan.CROSSWALK_DEPTH + 6));
+            }
             raw = RoadPlan.generate(BlockPos.ZERO, Direction.SOUTH, len, spec, cs, s.toPalette(), 0);
         }
 
