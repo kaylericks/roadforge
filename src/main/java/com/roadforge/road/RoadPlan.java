@@ -47,6 +47,28 @@ public final class RoadPlan {
             }
         }
 
+        // 3b. деревья по центру каждой полосы газона (разделитель, обочина)
+        if (spec.treeSpacing() > 0) {
+            int sp = spec.treeSpacing();
+            for (int i = 0; i < w; ) {
+                if (cs.cols().get(i) != Kind.GRASS) {
+                    i++;
+                    continue;
+                }
+                int j = i;
+                while (j + 1 < w && cs.cols().get(j + 1) == Kind.GRASS) {
+                    j++;
+                }
+                int mid = (i + j) / 2;
+                for (int s = 2; s < length - 2; s++) {
+                    if (s % sp == sp / 2 && g[s][mid].kind == Kind.GRASS) {
+                        Trees.plant(out, at(start, dir, right, s, mid - cs.ref()));
+                    }
+                }
+                i = j + 1;
+            }
+        }
+
         // 4. фонари (на крайних колонках тротуара, в шахматном порядке)
         if (spec.lampSpacing() > 0 && cs.lampLeft() >= 0) {
             int sp = spec.lampSpacing();
@@ -75,7 +97,8 @@ public final class RoadPlan {
 
     /** Колонка парковки у торца превращается в тротуар по диагонали (въезд «косым срезом»). */
     private static boolean parkTapered(int depth, int s, int length) {
-        return s < depth + 1 || s > length - 2 - depth;
+        int off = 1 + depth / 2;          // короткий срез: 2 колонки вглубь на каждые 2 блока длины
+        return s < off || s > length - 1 - off;
     }
 
     private static Surfaces.Cell cell(CrossSection cs, int i, int s, int length, Direction dir, Direction right,
@@ -163,8 +186,8 @@ public final class RoadPlan {
                                            Direction dir, Direction right, RoadSpec spec, RoadPalette pal) {
         int pd = Math.max(1, spec.parkDepth());
         int pitch = Math.max(2, spec.parkPitch());
-        int first = pd;
-        int last = length - 1 - pd;
+        int first = 1 + (pd - 1) / 2;
+        int last = length - 1 - first;
         int stalls = Math.max(0, last - first) / pitch;
         int sp = s - first;
         boolean boundary = sp >= 0 && sp <= stalls * pitch && sp % pitch == 0;
@@ -181,7 +204,7 @@ public final class RoadPlan {
                 // диагональные линии: со сдвигом на 1 ряд на каждую колонку вглубь
                 int shift = leftSide ? -depth : depth;
                 boolean on = Math.floorMod(sp - shift, pitch) == 0;
-                Direction f = leftSide ? right : dir;      // зеркально для другой стороны
+                Direction f = right;                       // обе стороны наклонены одинаково (как односторонняя парковка)
                 return on ? pal.diagonalState(f) : pal.asphaltState(dir);
             }
             default:

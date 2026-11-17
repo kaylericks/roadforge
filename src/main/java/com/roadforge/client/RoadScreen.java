@@ -134,19 +134,19 @@ public class RoadScreen extends Screen {
         stepper(x, y, "Ширина полосы", String.valueOf(s.laneWidth),
                 () -> s.laneWidth = Math.max(2, s.laneWidth - 1),
                 () -> s.laneWidth = Math.min(5, s.laneWidth + 1));
-        y += 22;
+        y += 20;
         stepper(x, y, "Тротуар", String.valueOf(s.sidewalkWidth),
                 () -> s.sidewalkWidth = Math.max(0, s.sidewalkWidth - 1),
                 () -> s.sidewalkWidth = Math.min(8, s.sidewalkWidth + 1));
-        y += 22;
+        y += 20;
         stepper(x, y, "Разделитель (нечёт.)", String.valueOf(s.medianWidth),
                 () -> s.medianWidth = s.medianWidth <= 1 ? 0 : s.medianWidth - 2,
                 () -> s.medianWidth = s.medianWidth == 0 ? 1 : Math.min(9, s.medianWidth + 2));
-        y += 22;
+        y += 20;
         stepper(x, y, "Обочина (газон)", String.valueOf(s.shoulderWidth),
                 () -> s.shoulderWidth = Math.max(0, s.shoulderWidth - 1),
                 () -> s.shoulderWidth = Math.min(4, s.shoulderWidth + 1));
-        y += 22;
+        y += 20;
         stepper(x, y, "Шаг фонарей (0=нет)", String.valueOf(s.lampSpacing),
                 () -> s.lampSpacing = s.lampSpacing <= 6 ? 0 : s.lampSpacing - 2,
                 () -> s.lampSpacing = s.lampSpacing == 0 ? 6 : Math.min(48, s.lampSpacing + 2));
@@ -154,13 +154,17 @@ public class RoadScreen extends Screen {
         y += 26;
         toggle(x, y, "Разметка", s.markings, () -> s.markings = !s.markings);
         toggle(x + 118, y, "Двойная осевая", s.doubleCenter, () -> s.doubleCenter = !s.doubleCenter);
-        y += 22;
+        y += 20;
         toggle(x, y, "Краевые линии", s.edgeLines, () -> s.edgeLines = !s.edgeLines);
         toggle(x + 118, y, "Торцы-уклоны", s.endCaps, () -> s.endCaps = !s.endCaps);
-        y += 22;
+        y += 20;
         stepper(x, y, "Переход каждые (0=нет)", String.valueOf(s.crossEvery),
                 () -> s.crossEvery = s.crossEvery <= 16 ? 0 : s.crossEvery - 8,
                 () -> s.crossEvery = s.crossEvery == 0 ? 24 : Math.min(128, s.crossEvery + 8));
+        y += 20;
+        stepper(x, y, "Деревья, шаг (0=нет)", String.valueOf(s.treeSpacing),
+                () -> s.treeSpacing = s.treeSpacing <= 5 ? 0 : s.treeSpacing - 1,
+                () -> s.treeSpacing = s.treeSpacing == 0 ? 8 : Math.min(32, s.treeSpacing + 1));
     }
 
     private void initBlocksTab(int x, int y) {
@@ -309,6 +313,15 @@ public class RoadScreen extends Screen {
         y += 22;
         stepper(x, y, "Диагональ (парковка)", deg(s.turnDiag), () -> s.turnDiag = (s.turnDiag + 3) % 4,
                 () -> s.turnDiag = (s.turnDiag + 1) % 4);
+        y += 22;
+        stepper(x, y, "Бордюр: внешний угол", deg(s.turnCornerOut), () -> s.turnCornerOut = (s.turnCornerOut + 3) % 4,
+                () -> s.turnCornerOut = (s.turnCornerOut + 1) % 4);
+        y += 22;
+        stepper(x, y, "Бордюр: внутр. угол", deg(s.turnCornerIn), () -> s.turnCornerIn = (s.turnCornerIn + 3) % 4,
+                () -> s.turnCornerIn = (s.turnCornerIn + 1) % 4);
+        y += 22;
+        stepper(x, y, "Бордюр: диагональ", deg(s.turnCurbDiago), () -> s.turnCurbDiago = (s.turnCurbDiago + 3) % 4,
+                () -> s.turnCurbDiago = (s.turnCurbDiago + 1) % 4);
     }
 
     private static String deg(int turns) {

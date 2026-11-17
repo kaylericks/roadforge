@@ -38,6 +38,7 @@ public class RoadSettings {
 
     // --- переходы на дороге ---
     public int crossEvery = 0;          // шаг пешеходных переходов, блоков (0 - нет)
+    public int treeSpacing = 0;         // шаг деревьев на газоне и острове кольца (0 - нет)
 
     // --- перекрёсток ---
     public BuildMode mode = BuildMode.ROAD;
@@ -77,6 +78,9 @@ public class RoadSettings {
     public int turnLine = 0;
     public int turnCross = 0;
     public int turnDiag = 0;
+    public int turnCornerOut = 0;       // внешний угловой блок бордюра
+    public int turnCornerIn = 0;        // внутренний угловой блок бордюра
+    public int turnCurbDiago = 0;       // диагональный блок бордюра
 
     public RoadSettings() {
         applyPreset(RoadPreset.CITY);
@@ -103,12 +107,13 @@ public class RoadSettings {
     public RoadSpec toSpec() {
         return new RoadSpec(preset.key, lanes, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
                 sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps,
-                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery);
+                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing);
     }
 
     public RoadPalette toPalette() {
         return new RoadPalette(asphalt, line, sidewalk, curb, grass, lamp, capPlain, capSolid, capDash,
-                crosswalk, diagonal, turnSidewalk, turnLamp, turnCap, turnLine, turnCross, turnDiag);
+                crosswalk, diagonal, turnSidewalk, turnLamp, turnCap, turnLine, turnCross, turnDiag,
+                turnCornerOut, turnCornerIn, turnCurbDiago);
     }
 
     public String get(Role r) {
@@ -163,6 +168,7 @@ public class RoadSettings {
         parkDepth = clamp(parkDepth, 1, 6);
         parkPitch = clamp(parkPitch, 2, 10);
         crossEvery = crossEvery <= 0 ? 0 : clamp(crossEvery, 16, 128);
+        treeSpacing = treeSpacing <= 0 ? 0 : clamp(treeSpacing, 5, 32);
         islandRadius = clamp(islandRadius, 3, 14);
         ringLanes = clamp(ringLanes, 1, 2);
         armLength = clamp(armLength, 4, 48);
@@ -173,6 +179,9 @@ public class RoadSettings {
         turnLine = Math.floorMod(turnLine, 4);
         turnCross = Math.floorMod(turnCross, 4);
         turnDiag = Math.floorMod(turnDiag, 4);
+        turnCornerOut = Math.floorMod(turnCornerOut, 4);
+        turnCornerIn = Math.floorMod(turnCornerIn, 4);
+        turnCurbDiago = Math.floorMod(turnCurbDiago, 4);
 
         RoadPalette d = RoadPalette.DEFAULT;
         asphalt = fix(asphalt, d.asphalt());
@@ -258,6 +267,7 @@ public class RoadSettings {
         b.writeVarInt(parkDepth);
         b.writeVarInt(parkPitch);
         b.writeVarInt(crossEvery);
+        b.writeVarInt(treeSpacing);
 
         b.writeEnum(mode);
         b.writeVarInt(crossLanes);
@@ -290,6 +300,9 @@ public class RoadSettings {
         b.writeVarInt(turnLine);
         b.writeVarInt(turnCross);
         b.writeVarInt(turnDiag);
+        b.writeVarInt(turnCornerOut);
+        b.writeVarInt(turnCornerIn);
+        b.writeVarInt(turnCurbDiago);
     }
 
     public static RoadSettings decode(FriendlyByteBuf b) {
@@ -314,6 +327,7 @@ public class RoadSettings {
         s.parkDepth = b.readVarInt();
         s.parkPitch = b.readVarInt();
         s.crossEvery = b.readVarInt();
+        s.treeSpacing = b.readVarInt();
 
         s.mode = b.readEnum(BuildMode.class);
         s.crossLanes = b.readVarInt();
@@ -346,6 +360,9 @@ public class RoadSettings {
         s.turnLine = b.readVarInt();
         s.turnCross = b.readVarInt();
         s.turnDiag = b.readVarInt();
+        s.turnCornerOut = b.readVarInt();
+        s.turnCornerIn = b.readVarInt();
+        s.turnCurbDiago = b.readVarInt();
         return s;
     }
 }

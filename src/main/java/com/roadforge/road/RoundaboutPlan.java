@@ -123,6 +123,10 @@ public final class RoundaboutPlan {
             }
         }
 
+        if (st.treeSpacing > 0) {
+            Trees.plant(out, new BlockPos(cx, cy, cz));
+        }
+
         // фонари: по кругу площадки и вдоль веток
         if (st.lampSpacing > 0) {
             int sp = st.lampSpacing;
