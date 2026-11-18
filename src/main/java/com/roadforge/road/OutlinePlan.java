@@ -116,6 +116,10 @@ public final class OutlinePlan {
                     break;
                 }
                 PathPlan.Centerline cl = PathPlan.centerline(pts, PathPlan.axisRadius(st));
+                if (cl.samples.size() < 2) {
+                    o.label = "Путь: добавь ещё точку";
+                    break;
+                }
                 double left = -ref - 0.5;
                 double rightEdge = w - ref - 0.5;
                 double[] pl = null;

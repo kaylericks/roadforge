@@ -41,9 +41,16 @@ public final class ClientForgeEvents {
             }
         }
         if (mc.level != null && mc.screen == null && holdingWand(mc)) {
-            aim = Aim.pick(mc, Aim.planeY(mc));
-            outline = OutlinePlan.compute(ClientState.settings(), ClientState.pointA(), ClientState.pointB(),
-                    ClientState.path(), aim);
+            try {
+                aim = Aim.pick(mc, Aim.planeY(mc));
+                outline = OutlinePlan.compute(ClientState.settings(), ClientState.pointA(), ClientState.pointB(),
+                        ClientState.path(), aim);
+            } catch (RuntimeException e) {
+                // контур - только подсветка: ошибка в нём не должна ронять игру
+                aim = null;
+                outline = null;
+                RoadForge.LOGGER.warn("RoadForge: outline failed: {}", e.toString());
+            }
         } else {
             aim = null;
             outline = null;
