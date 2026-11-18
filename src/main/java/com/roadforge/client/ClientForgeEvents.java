@@ -64,7 +64,7 @@ public final class ClientForgeEvents {
                 Net.CHANNEL.sendToServer(new PickPacket(PickPacket.Action.CLICK, aim));
             }
             event.setCanceled(true);
-            event.setSwingHit(true);
+            event.setSwingHand(true);
         } else if (event.isAttack()) {
             Net.CHANNEL.sendToServer(new PickPacket(PickPacket.Action.UNDO_POINT, BlockPos.ZERO));
             event.setCanceled(true);
