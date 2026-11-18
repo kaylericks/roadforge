@@ -6,6 +6,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,6 +18,8 @@ public final class PlayerRoadState {
 
     public BlockPos a;
     public BlockPos b;
+    /** Точки режима «Путь» по порядку. */
+    public final List<BlockPos> path = new ArrayList<>();
     public RoadSettings settings = new RoadSettings();
 
     public static PlayerRoadState of(ServerPlayer p) {

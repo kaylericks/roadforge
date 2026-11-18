@@ -293,6 +293,12 @@ public final class RoundaboutPlan {
         return sb.toString().trim();
     }
 
+    /** Радиусы: остров, внешний край кольца, внешний край площадки. */
+    public static int[] radii(RoadSettings st) {
+        Geo g = new Geo(st);
+        return new int[]{g.rIn, g.rOut, g.rPlaza};
+    }
+
     /** Размер сетки для оценки числа блоков. */
     public static int footprint(RoadSettings st) {
         Geo g = new Geo(st);

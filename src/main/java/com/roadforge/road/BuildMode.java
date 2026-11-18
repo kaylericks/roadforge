@@ -4,7 +4,7 @@ public enum BuildMode {
     ROAD("Дорога"),
     INTERSECTION("Перекрёсток"),
     ROUNDABOUT("Кольцо"),
-    CURVE("Изгиб");
+    PATH("Путь");
 
     public final String title;
 

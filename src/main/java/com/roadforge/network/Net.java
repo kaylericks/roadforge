@@ -9,7 +9,7 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class Net {
-    private static final String PROTOCOL = "3";
+    private static final String PROTOCOL = "4";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(RoadForge.MOD_ID, "main"),
@@ -26,10 +26,12 @@ public final class Net {
                 ActionPacket::decode, ActionPacket::handle);
         CHANNEL.registerMessage(id++, PointsPacket.class, PointsPacket::encode,
                 PointsPacket::decode, PointsPacket::handle);
+        CHANNEL.registerMessage(id++, PickPacket.class, PickPacket::encode,
+                PickPacket::decode, PickPacket::handle);
     }
 
     public static void sendPoints(ServerPlayer player, PlayerRoadState st) {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new PointsPacket(st.a, st.b));
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new PointsPacket(st.a, st.b, new java.util.ArrayList<>(st.path)));
     }
 
     private Net() {}

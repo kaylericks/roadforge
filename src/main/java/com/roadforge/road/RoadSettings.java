@@ -55,9 +55,6 @@ public class RoadSettings {
     public int islandRadius = 6;        // радиус центрального острова
     public int ringLanes = 2;           // полос на кольце (1 или 2)
 
-    // --- изгиб (поворот между двумя точками) ---
-    public boolean curveFirstX = true;  // первый участок от точки A идёт вдоль X (иначе вдоль Z)
-
     // --- блоки ---
     public String asphalt = RoadPalette.DEFAULT.asphalt();
     public String line = RoadPalette.DEFAULT.line();
@@ -280,7 +277,6 @@ public class RoadSettings {
         b.writeBoolean(crosswalks);
         b.writeVarInt(islandRadius);
         b.writeVarInt(ringLanes);
-        b.writeBoolean(curveFirstX);
 
         b.writeUtf(asphalt);
         b.writeUtf(line);
@@ -340,7 +336,6 @@ public class RoadSettings {
         s.crosswalks = b.readBoolean();
         s.islandRadius = b.readVarInt();
         s.ringLanes = b.readVarInt();
-        s.curveFirstX = b.readBoolean();
 
         s.asphalt = b.readUtf();
         s.line = b.readUtf();

@@ -43,6 +43,7 @@ public record ActionPacket(Action action) {
                     PlayerRoadState st = PlayerRoadState.of(sp);
                     st.a = null;
                     st.b = null;
+                    st.path.clear();
                     Net.sendPoints(sp, st);
                 }
             }
