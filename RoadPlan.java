@@ -15,15 +15,29 @@ public final class RoadPlan {
 
     public static List<Placement> generate(BlockPos start, Direction dir, int length, RoadSpec spec,
                                            CrossSection cs, RoadPalette pal, int clearHeight) {
+        return generate(start, dir, length, start.getY(), spec, cs, pal, clearHeight);
+    }
+
+    /** Дорога с подъёмом/спуском от высоты start до endY (слои, не круче слой за 2 блока). */
+    public static List<Placement> generate(BlockPos start, Direction dir, int length, int endY, RoadSpec spec,
+                                           CrossSection cs, RoadPalette pal, int clearHeight) {
         int w = cs.width();
         List<Placement> out = new ArrayList<>(length * w * (2 + clearHeight));
         Direction right = dir.getClockWise();
         BlockState air = Blocks.AIR.defaultBlockState();
 
+        Grade grade = Grade.of(new double[]{0, Math.max(1, length - 1)}, new int[]{start.getY(), endY});
+        int[] off = new int[length];
+        Grade.Ramp[] ramps = new Grade.Ramp[length];
+        for (int s = 0; s < length; s++) {
+            off[s] = grade.layerAt(s) - start.getY();
+            ramps[s] = grade.rampAt(s);
+        }
+
         // 1. очистка пространства над дорогой
         for (int s = 0; s < length; s++) {
             for (int i = 0; i < w; i++) {
-                BlockPos base = at(start, dir, right, s, i - cs.ref());
+                BlockPos base = at(start, dir, right, s, i - cs.ref()).above(off[s]);
                 for (int h = 1; h <= clearHeight; h++) {
                     out.add(new Placement(base.above(h), air));
                 }
@@ -39,11 +53,25 @@ public final class RoadPlan {
         }
         addCrosswalks(g, cs, length, dir, right, spec, pal);
         Surfaces.resolve(g, dir, right);
+        for (int s = 0; s < length; s++) {
+            if (ramps[s] != null) {
+                Direction face = ramps[s].up ? dir.getOpposite() : dir;
+                for (int i = 0; i < w; i++) {
+                    Kind k = g[s][i].kind;
+                    if (!g[s][i].paving && (k == Kind.ASPHALT || k == Kind.LINE_SOLID || k == Kind.LINE_DASH)) {
+                        boolean on = Math.floorMod(s, spec.dashPeriod()) < spec.dashOn();
+                        String id = k == Kind.LINE_SOLID ? pal.capSolid()
+                                : (k == Kind.LINE_DASH && on ? pal.capDash() : pal.capPlain());
+                        g[s][i] = Surfaces.Cell.road(k, pal.capState(id, face));
+                    }
+                }
+            }
+        }
 
         // 3. поверхность
         for (int s = 0; s < length; s++) {
             for (int i = 0; i < w; i++) {
-                out.add(new Placement(at(start, dir, right, s, i - cs.ref()), Surfaces.finish(g[s][i], pal)));
+                out.add(new Placement(at(start, dir, right, s, i - cs.ref()).above(off[s]), Surfaces.finish(g[s][i], pal)));
             }
         }
 
@@ -62,7 +90,7 @@ public final class RoadPlan {
                 int mid = (i + j) / 2;
                 for (int s = 2; s < length - 2; s++) {
                     if (s % sp == sp / 2 && g[s][mid].kind == Kind.GRASS) {
-                        Trees.plant(out, at(start, dir, right, s, mid - cs.ref()));
+                        Trees.plant(out, at(start, dir, right, s, mid - cs.ref()).above(off[s]));
                     }
                 }
                 i = j + 1;
@@ -75,11 +103,11 @@ public final class RoadPlan {
             int half = sp / 2;
             for (int s = 1; s < length - 1; s++) {
                 if (s % sp == half) {
-                    BlockPos p = at(start, dir, right, s, cs.lampLeft() - cs.ref()).above();
+                    BlockPos p = at(start, dir, right, s, cs.lampLeft() - cs.ref()).above(off[s] + 1);
                     out.add(new Placement(p, pal.lampState(right)));
                 }
                 if (s % sp == 0) {
-                    BlockPos p = at(start, dir, right, s, cs.lampRight() - cs.ref()).above();
+                    BlockPos p = at(start, dir, right, s, cs.lampRight() - cs.ref()).above(off[s] + 1);
                     out.add(new Placement(p, pal.lampState(right.getOpposite())));
                 }
             }

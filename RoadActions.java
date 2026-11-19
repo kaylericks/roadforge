@@ -90,7 +90,14 @@ public final class RoadActions {
                     + "), лимит " + RoadConfig.MAX_BLOCKS_PER_BUILD.get() + "."));
             return;
         }
-        List<Placement> plan = RoadPlan.generate(st.a, st.direction(), len, spec, cs,
+        int endY = st.b.getY();
+        String steep = com.roadforge.road.Grade.check(new double[]{0, Math.max(1, len - 1)},
+                new int[]{st.a.getY(), endY});
+        if (steep != null) {
+            player.sendSystemMessage(Component.literal("§c" + steep));
+            return;
+        }
+        List<Placement> plan = RoadPlan.generate(st.a, st.direction(), len, endY, spec, cs,
                 st.settings.toPalette(), CLEAR_HEIGHT);
         BuildManager.enqueue(player.serverLevel(), player.getUUID(), plan, true, "Дорога построена");
         player.sendSystemMessage(Component.literal("§eСтрою: " + describe(st)
@@ -131,6 +138,11 @@ public final class RoadActions {
             return;
         }
         st.settings.sanitize();
+        String steep = PathPlan.check(st.path, st.settings);
+        if (steep != null) {
+            player.sendSystemMessage(Component.literal("§c" + steep));
+            return;
+        }
         List<Placement> plan = PathPlan.generate(st.path, st.settings, CLEAR_HEIGHT);
         if (plan.size() > RoadConfig.MAX_BLOCKS_PER_BUILD.get()) {
             player.sendSystemMessage(Component.literal("§cСлишком много блоков (" + plan.size()

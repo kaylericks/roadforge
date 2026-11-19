@@ -97,6 +97,13 @@ public final class OutlinePlan {
                     o.posts.add(new double[]{b.getX() + 0.5, b.getZ() + 0.5});
                 }
                 o.label = "Дорога: " + len + " м · полос " + spec.lanes();
+                int dy = end.getY() - a.getY();
+                if (dy != 0) {
+                    o.label += " · " + (dy > 0 ? "подъём +" : "спуск ") + dy;
+                    if (Grade.check(new double[]{0, Math.max(1, len - 1)}, new int[]{a.getY(), end.getY()}) != null) {
+                        o.label += " · СЛИШКОМ КРУТО";
+                    }
+                }
             }
             case PATH -> {
                 List<BlockPos> pts = new ArrayList<>(path);
@@ -150,6 +157,9 @@ public final class OutlinePlan {
                         first.x - first.tz * rightEdge, first.z + first.tx * rightEdge});
                 o.label = "Путь: " + (int) Math.round(cl.length) + " м · полос " + spec.lanes()
                         + " · точек " + path.size();
+                if (Grade.check(cl.ctrlS, cl.ctrlY) != null) {
+                    o.label += " · СЛИШКОМ КРУТО";
+                }
             }
             case INTERSECTION, ROUNDABOUT -> {
                 BlockPos c = a != null ? a : aim;

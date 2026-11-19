@@ -43,6 +43,9 @@ public final class PathPlan {
     public static final class Centerline {
         public final List<Sample> samples = new ArrayList<>();
         public double length;
+        /** Положения исходных точек вдоль пути и их слои высоты. */
+        public double[] ctrlS = new double[0];
+        public int[] ctrlY = new int[0];
     }
 
     private static final class Cand {
@@ -51,7 +54,6 @@ public final class PathPlan {
         double s;
         double tx;
         double tz;
-        int y;
     }
 
     /** Радиус скругления оси для данных настроек (внутренний бордюр не меньше cornerRadius). */
@@ -185,23 +187,39 @@ public final class PathPlan {
                     tz = Math.cos(ang) * sgn;
                 }
                 double ps = done + segLen * f;
-                out.samples.add(new Sample(x, z, tx, tz, ps, heightAt(ps / Math.max(1e-9, total), ys)));
+                out.samples.add(new Sample(x, z, tx, tz, ps, 0));
             }
             done += segLen;
+        }
+        // положения исходных точек: ближайшая выборка оси
+        out.ctrlS = new double[n];
+        out.ctrlY = new int[n];
+        for (int i = 0; i < n; i++) {
+            double bestD = Double.MAX_VALUE;
+            double bestS = 0;
+            for (Sample sm : out.samples) {
+                double d = Math.hypot(sm.x - p.get(i)[0], sm.z - p.get(i)[1]);
+                if (d < bestD) {
+                    bestD = d;
+                    bestS = sm.s;
+                }
+            }
+            out.ctrlS[i] = i == 0 ? 0 : (i == n - 1 ? total : bestS);
+            out.ctrlY[i] = ys.get(i);
+        }
+        for (int i = 1; i < n; i++) {
+            out.ctrlS[i] = Math.max(out.ctrlS[i], out.ctrlS[i - 1]);
         }
         return out;
     }
 
-    /** Высота в точке пути: плавно между высотами точек, по равномерной доле пути. */
-    private static int heightAt(double frac, List<Integer> ys) {
-        int n = ys.size();
-        if (n == 1) {
-            return ys.get(0);
+    /** Текст ошибки, если уклон пути круче допустимого, иначе null. */
+    public static String check(List<BlockPos> pts, RoadSettings st) {
+        Centerline cl = centerline(pts, axisRadius(st));
+        if (cl.ctrlS.length < 2) {
+            return null;
         }
-        double pos = Math.max(0, Math.min(1, frac)) * (n - 1);
-        int i = Math.min(n - 2, (int) Math.floor(pos));
-        double f = pos - i;
-        return (int) Math.round(ys.get(i) + (ys.get(i + 1) - ys.get(i)) * f);
+        return Grade.check(cl.ctrlS, cl.ctrlY);
     }
 
     private static long key(int x, int z) {
@@ -230,6 +248,7 @@ public final class PathPlan {
         if (line.samples.size() < 2) {
             return out;
         }
+        Grade grade = Grade.of(line.ctrlS, line.ctrlY);
 
         // 1. растеризация: каждая клетка берёт ближайшую выборку оси
         int reach = Math.max(ref, w - 1 - ref) + 2;
@@ -262,7 +281,6 @@ public final class PathPlan {
                         c.s = sm.s;
                         c.tx = sm.tx;
                         c.tz = sm.tz;
-                        c.y = sm.y;
                     }
                 }
             }
@@ -314,8 +332,18 @@ public final class PathPlan {
             }
             cell.tag = (int) Math.floor(c.s);
             cell.lat = c.idx;
+            Grade.Ramp ramp = grade.rampAt(c.s);
+            if (ramp != null && !cell.paving
+                    && (kind == Kind.ASPHALT || kind == Kind.LINE_SOLID || kind == Kind.LINE_DASH)) {
+                Direction travel = cardinal(c.tx, c.tz);
+                Direction face = ramp.up ? travel.getOpposite() : travel;
+                boolean on = Math.floorMod((int) Math.floor(c.s), spec.dashPeriod()) < spec.dashOn();
+                String id = kind == Kind.LINE_SOLID ? pal.capSolid()
+                        : (kind == Kind.LINE_DASH && on ? pal.capDash() : pal.capPlain());
+                cell.state = pal.capState(id, face);
+            }
             grid[x - x0][z - z0] = cell;
-            ys[x - x0][z - z0] = c.y;
+            ys[x - x0][z - z0] = grade.layerAt(c.s);
         }
         Surfaces.resolve(grid, Direction.EAST, Direction.SOUTH);
 
