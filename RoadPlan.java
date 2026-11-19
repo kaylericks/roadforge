@@ -7,6 +7,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /** Превращает параметры дороги в список блоков (прямой участок вдоль оси). */
 public final class RoadPlan {
@@ -83,6 +84,22 @@ public final class RoadPlan {
                         out.add(new Placement(at(start, dir, right, s, i - cs.ref()).above(off[s] + 1),
                                 pal.guardState(g[s][i].face)));
                     }
+                }
+            }
+        }
+
+        // 3c. маркеры опор моста: Foundation доведёт их до земли только там, где под дорогой пустота
+        if (spec.pierSpacing() > 0) {
+            Set<Long> seen = Piers.newSet();
+            int[] lats = Piers.lateral(cs);
+            for (int s = 2; s < length - 2; s++) {
+                int m = s % spec.pierSpacing();
+                if (m != 0 && m != 1) {
+                    continue;
+                }
+                for (int i : lats) {
+                    BlockPos p = at(start, dir, right, s, i - cs.ref());
+                    Piers.mark(out, seen, p.getX(), start.getY() + off[s], p.getZ());
                 }
             }
         }

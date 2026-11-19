@@ -40,9 +40,19 @@ public final class ClientForgeEvents {
                 mc.setScreen(new RoadScreen());
             }
         }
+        while (ClientModEvents.HEIGHT_UP.consumeClick()) {
+            if (holdingWand(mc)) {
+                Aim.heightOffset++;
+            }
+        }
+        while (ClientModEvents.HEIGHT_DOWN.consumeClick()) {
+            if (holdingWand(mc)) {
+                Aim.heightOffset--;
+            }
+        }
         if (mc.level != null && mc.screen == null && holdingWand(mc)) {
             try {
-                aim = Aim.pick(mc, Aim.planeY(mc));
+                aim = Aim.pick(mc);
                 outline = OutlinePlan.compute(ClientState.settings(), ClientState.pointA(), ClientState.pointB(),
                         ClientState.path(), aim);
             } catch (RuntimeException e) {
@@ -69,6 +79,7 @@ public final class ClientForgeEvents {
                 Net.CHANNEL.sendToServer(new PickPacket(PickPacket.Action.BUILD, BlockPos.ZERO));
             } else if (aim != null) {
                 Net.CHANNEL.sendToServer(new PickPacket(PickPacket.Action.CLICK, aim));
+                Aim.heightOffset = 0;
             }
             event.setCanceled(true);
             event.setSwingHand(true);
@@ -76,6 +87,17 @@ public final class ClientForgeEvents {
             Net.CHANNEL.sendToServer(new PickPacket(PickPacket.Action.UNDO_POINT, BlockPos.ZERO));
             event.setCanceled(true);
         }
+    }
+
+    /** Ctrl + колесо мыши с жезлом в руке: выше / ниже. */
+    @SubscribeEvent
+    public static void onScroll(net.minecraftforge.client.event.InputEvent.MouseScrollingEvent event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen != null || !holdingWand(mc) || !net.minecraft.client.gui.screens.Screen.hasControlDown()) {
+            return;
+        }
+        Aim.heightOffset += event.getScrollDelta() > 0 ? 1 : -1;
+        event.setCanceled(true);
     }
 
     @SubscribeEvent
@@ -138,6 +160,8 @@ public final class ClientForgeEvents {
         int x = event.getWindow().getGuiScaledWidth() / 2;
         int y = event.getWindow().getGuiScaledHeight() / 2 + 14;
         event.getGuiGraphics().drawCenteredString(mc.font, outline.label, x, y, 0x55FFFF);
+        event.getGuiGraphics().drawCenteredString(mc.font, Aim.heightLabel(), x, y + 11,
+                Aim.heightOffset == 0 ? 0xAAAAAA : 0xFFD24A);
     }
 
     private ClientForgeEvents() {}

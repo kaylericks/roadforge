@@ -38,6 +38,7 @@ public class RoadSettings {
 
     // --- переходы на дороге ---
     public int crossEvery = 0;          // шаг пешеходных переходов, блоков (0 - нет)
+    public int pierSpacing = 12;        // шаг опор моста (0 - нет)
     public int guard = 0;               // ограждения: 0 нет, 1 разделитель, 2 края, 3 везде
     public int treeSpacing = 0;         // шаг деревьев на газоне и острове кольца (0 - нет)
 
@@ -107,7 +108,7 @@ public class RoadSettings {
     public RoadSpec toSpec() {
         return new RoadSpec(preset.key, lanes, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
                 sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps,
-                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing, guard);
+                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing, guard, pierSpacing);
     }
 
     public RoadPalette toPalette() {
@@ -183,6 +184,7 @@ public class RoadSettings {
         turnDiag = Math.floorMod(turnDiag, 4);
         turnGuard = Math.floorMod(turnGuard, 4);
         guard = clamp(guard, 0, 3);
+        pierSpacing = pierSpacing <= 0 ? 0 : clamp(pierSpacing, 6, 40);
         turnCornerOut = Math.floorMod(turnCornerOut, 4);
         turnCornerIn = Math.floorMod(turnCornerIn, 4);
         turnCurbDiago = Math.floorMod(turnCurbDiago, 4);
@@ -306,6 +308,7 @@ public class RoadSettings {
         b.writeVarInt(turnDiag);
         b.writeVarInt(turnGuard);
         b.writeVarInt(guard);
+        b.writeVarInt(pierSpacing);
         b.writeUtf(guardrail);
         b.writeVarInt(turnCornerOut);
         b.writeVarInt(turnCornerIn);
@@ -368,6 +371,7 @@ public class RoadSettings {
         s.turnDiag = b.readVarInt();
         s.turnGuard = b.readVarInt();
         s.guard = b.readVarInt();
+        s.pierSpacing = b.readVarInt();
         s.guardrail = b.readUtf();
         s.turnCornerOut = b.readVarInt();
         s.turnCornerIn = b.readVarInt();

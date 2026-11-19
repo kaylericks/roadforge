@@ -383,6 +383,25 @@ public final class PathPlan {
             }
         }
 
+        // 3c. маркеры опор моста
+        if (spec.pierSpacing() > 0) {
+            Set<Long> seen = Piers.newSet();
+            int[] lats = Piers.lateral(cs);
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    Surfaces.Cell c = grid[x - x0][z - z0];
+                    if (c == null || c.tag < 2) {
+                        continue;
+                    }
+                    int m = Math.floorMod(c.tag, spec.pierSpacing());
+                    if ((m != 0 && m != 1) || (c.lat != lats[0] && c.lat != lats[1] && c.lat != lats[2])) {
+                        continue;
+                    }
+                    Piers.mark(out, seen, x, ys[x - x0][z - z0], z);
+                }
+            }
+        }
+
         // 4. фонари по краям профиля, шаг - вдоль пути
         if (spec.lampSpacing() > 0 && cs.lampLeft() >= 0) {
             int sp = spec.lampSpacing();
