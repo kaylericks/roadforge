@@ -16,6 +16,19 @@ public record CrossSection(List<Kind> cols, List<Integer> depths, int ref, int l
         return cols.size();
     }
 
+    private static boolean roadKind(Kind k) {
+        return k == Kind.ASPHALT || k == Kind.LINE_SOLID || k == Kind.LINE_DASH
+                || k == Kind.PARK_EDGE || k == Kind.PARK_BAY;
+    }
+
+    /** Колонка газона разделителя, которая касается проезжей части: на ней ставится бордюр. */
+    public boolean medianEdge(int i) {
+        if (cols.get(i) != Kind.GRASS || i < roadFirst || i > roadLast) {
+            return false;
+        }
+        return (i > 0 && roadKind(cols.get(i - 1))) || (i + 1 < cols.size() && roadKind(cols.get(i + 1)));
+    }
+
     public static CrossSection build(RoadSpec s) {
         List<Kind> c = new ArrayList<>();
         List<Integer> d = new ArrayList<>();

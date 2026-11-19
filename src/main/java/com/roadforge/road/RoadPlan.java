@@ -110,6 +110,9 @@ public final class RoadPlan {
         if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
             return Surfaces.Cell.paving(k == Kind.SIDEWALK_L ? right : right.getOpposite());
         }
+        if (cs.medianEdge(i)) {
+            return Surfaces.Cell.paving(towardRoad);      // бордюр по краям газона разделителя
+        }
         if (isParking(k) && parkTapered(depth, s, length)) {
             return Surfaces.Cell.paving(towardRoad);
         }

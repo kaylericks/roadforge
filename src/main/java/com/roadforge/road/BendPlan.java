@@ -181,7 +181,9 @@ public final class BendPlan {
                 }
                 Kind k = g.cs.cols().get(idx);
                 Surfaces.Cell c;
-                if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
+                if (g.cs.medianEdge(idx)) {
+                    c = Surfaces.Cell.paving(toRoad);
+                } else if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
                     c = Surfaces.Cell.paving(toRoad);
                 } else {
                     if (k == Kind.PARK_EDGE || k == Kind.PARK_BAY) {

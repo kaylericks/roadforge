@@ -292,7 +292,9 @@ public final class PathPlan {
             Cand c = e.getValue();
             Kind kind = cs.cols().get(c.idx);
             Surfaces.Cell cell;
-            if (kind == Kind.SIDEWALK_L || kind == Kind.SIDEWALK_R) {
+            if (cs.medianEdge(c.idx)) {
+                cell = Surfaces.Cell.paving(Direction.NORTH);
+            } else if (kind == Kind.SIDEWALK_L || kind == Kind.SIDEWALK_R) {
                 // дорога лежит в сторону оси: слева от оси - вправо, справа - влево
                 double rx = -c.tz;
                 double rz = c.tx;

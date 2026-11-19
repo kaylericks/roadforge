@@ -18,6 +18,7 @@ final class Surfaces {
         boolean paving;       // тротуар (бордюр или покрытие - решает resolve)
         boolean island;       // клетка острова: внутри вместо покрытия - газон
         boolean forceCurb;    // всегда бордюр (кольцо вокруг острова)
+        boolean trim;         // убрать одиночные «выступы» (остров и площадка кольца)
         boolean curb;         // итог: бордюр
         boolean ramp;         // рядом зебра: бордюра нет (съезд)
         int shape;            // вид бордюра: STRAIGHT / OUTER / INNER / DIAGO
@@ -159,73 +160,68 @@ final class Surfaces {
     }
 
     /**
-     * Второй проход: подбирает вид бордюра. Угол тротуара: одиночный - внешний угловой блок, цепочка по
-     * диагонали - диагональные блоки; вогнутый угол - внутренний угловой блок. Направление блока:
-     * дорога лежит между a и a.cw (для прямого - в сторону a).
+     * Второй проход: вид бордюра. По краям только прямые и диагональные блоки: клетка, у которой дорога
+     * с двух соседних сторон (угол тротуара), получает диагональный блок (срез угла под 45°).
+     * Направление: дорога лежит между a и a.cw.
      */
     static void shapes(Cell[][] g, Direction di, Direction dj) {
+        trimTips(g, di, dj);
         for (int i = 0; i < g.length; i++) {
             for (int j = 0; j < g[i].length; j++) {
                 Cell c = g[i][j];
-                if (c == null || !c.paving || c.island && !c.curb) {
+                if (c == null || !c.paving || !c.curb) {
                     continue;
                 }
-                int m = roadMask(g, i, j, di, dj);
-                if (c.curb) {
-                    Direction a = cornerFacing(m);
-                    if (a == null) {
-                        continue;
-                    }
+                Direction a = cornerFacing(roadMask(g, i, j, di, dj));
+                if (a != null) {
                     c.face = a;
-                    c.shape = OUTER;
-                    int[] sa = step(a, di, dj);
-                    int[] sb = step(a.getClockWise(), di, dj);
-                    int wi = sa[0] - sb[0];
-                    int wj = sa[1] - sb[1];
-                    if (isCornerOf(g, i + wi, j + wj, a, di, dj) || isCornerOf(g, i - wi, j - wj, a, di, dj)) {
-                        c.shape = DIAGO;
-                    }
-                } else if (m == 0 && !c.ramp) {
-                    Direction found = null;
-                    int count = 0;
-                    for (Direction a : HORIZ) {
-                        int[] sa = step(a, di, dj);
-                        int[] sb = step(a.getClockWise(), di, dj);
-                        Cell diag = at(g, i + sa[0] + sb[0], j + sa[1] + sb[1]);
-                        Cell n1 = at(g, i + sa[0], j + sa[1]);
-                        Cell n2 = at(g, i + sb[0], j + sb[1]);
-                        if (diag != null && isRoad(diag.kind) && n1 != null && n1.paving && n2 != null && n2.paving) {
-                            found = a;
-                            count++;
-                        }
-                    }
-                    if (count == 1) {
-                        c.curb = true;
-                        c.shape = INNER;
-                        c.face = found;
-                    }
+                    c.shape = DIAGO;
                 }
             }
         }
-        dropInnerNextToDiago(g, di, dj);
     }
 
-    /** Внутренний угол рядом с диагональным блоком не нужен: диагональ уже замыкает линию бордюра. */
-    private static void dropInnerNextToDiago(Cell[][] g, Direction di, Direction dj) {
+    /** Одиночные выступы острова и площадки (клетка с дорогой с трёх сторон или с двух противоположных). */
+    private static void trimTips(Cell[][] g, Direction di, Direction dj) {
+        boolean changed = false;
         for (int i = 0; i < g.length; i++) {
             for (int j = 0; j < g[i].length; j++) {
                 Cell c = g[i][j];
-                if (c == null || !c.paving || c.shape != INNER) {
+                if (c == null || !c.paving || !c.trim) {
                     continue;
                 }
-                for (Direction d : HORIZ) {
-                    int[] st = step(d, di, dj);
-                    Cell n = at(g, i + st[0], j + st[1]);
-                    if (n != null && n.paving && n.curb && n.shape == DIAGO) {
-                        c.curb = false;
-                        c.shape = STRAIGHT;
-                        break;
+                int m = roadMask(g, i, j, di, dj);
+                boolean opposite = ((m & bit(Direction.NORTH)) != 0 && (m & bit(Direction.SOUTH)) != 0)
+                        || ((m & bit(Direction.EAST)) != 0 && (m & bit(Direction.WEST)) != 0);
+                if (Integer.bitCount(m) >= 3 || opposite) {
+                    g[i][j] = Cell.road(Kind.ASPHALT, null);
+                    changed = true;
+                }
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        // после замены соседям нужно пересчитать бордюр: простой повторный проход по рёбрам
+        for (int i = 0; i < g.length; i++) {
+            for (int j = 0; j < g[i].length; j++) {
+                Cell c = g[i][j];
+                if (c == null || !c.paving) {
+                    continue;
+                }
+                if (c.forceCurb) {
+                    c.curb = true;
+                    continue;
+                }
+                int m = roadMask(g, i, j, di, dj);
+                if (m != 0 && !c.ramp) {
+                    for (Direction d : HORIZ) {
+                        if ((m & bit(d)) != 0) {
+                            c.face = d;
+                            break;
+                        }
                     }
+                    c.curb = true;
                 }
             }
         }
@@ -239,15 +235,10 @@ final class Surfaces {
     /** Итоговый блок клетки. */
     static BlockState finish(Cell c, RoadPalette pal) {
         if (!c.paving) {
-            return c.state;
+            return c.state != null ? c.state : pal.asphaltState(Direction.EAST);
         }
         if (c.curb) {
-            return switch (c.shape) {
-                case OUTER -> pal.curbOuterState(c.face);
-                case INNER -> pal.curbInnerState(c.face);
-                case DIAGO -> pal.curbDiagoState(c.face);
-                default -> pal.curbState(c.face);
-            };
+            return c.shape == DIAGO ? pal.curbDiagoState(c.face) : pal.curbState(c.face);
         }
         if (c.island) {
             return pal.grassState();
