@@ -26,6 +26,7 @@ public record RoadPalette(
         String capDash,
         String crosswalk,
         String diagonal,
+        String guardrail,
         int turnSidewalk,
         int turnLamp,
         int turnCap,
@@ -34,7 +35,8 @@ public record RoadPalette(
         int turnDiag,
         int turnCornerOut,
         int turnCornerIn,
-        int turnCurbDiago
+        int turnCurbDiago,
+        int turnGuard
 ) {
     public static final RoadPalette DEFAULT = new RoadPalette(
             "routemod:asphalte",              // низкий асфальт (10/16), как и линии
@@ -48,7 +50,8 @@ public record RoadPalette(
             "roadmarks:pente_1_pointille",
             "routemod:passage_pieton",
             "routemod:ligne_diagonale",
-            0, 0, 0, 0, 0, 0, 0, 0, 0
+            "routemod:glissiere_securite",
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     );
 
     private static final Map<String, Optional<Block>> CACHE = new HashMap<>();
@@ -122,6 +125,11 @@ public record RoadPalette(
     public BlockState curbDiagoState(Direction f) {
         String id = variantId("diago");
         return id == null ? curbOuterState(f) : state(id, turn(f, turnCurbDiago));
+    }
+
+    /** Ограждение; f - сторона, с которой едет транспорт (лицевая сторона балки). */
+    public BlockState guardState(Direction f) {
+        return state(guardrail, turn(f, turnGuard));
     }
 
     public BlockState grassState() {

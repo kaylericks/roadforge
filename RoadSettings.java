@@ -38,6 +38,7 @@ public class RoadSettings {
 
     // --- переходы на дороге ---
     public int crossEvery = 0;          // шаг пешеходных переходов, блоков (0 - нет)
+    public int guard = 0;               // ограждения: 0 нет, 1 разделитель, 2 края, 3 везде
     public int treeSpacing = 0;         // шаг деревьев на газоне и острове кольца (0 - нет)
 
     // --- перекрёсток ---
@@ -62,6 +63,7 @@ public class RoadSettings {
     public String curb = RoadPalette.DEFAULT.curb();
     public String grass = RoadPalette.DEFAULT.grass();
     public String lamp = RoadPalette.DEFAULT.lamp();
+    public String guardrail = RoadPalette.DEFAULT.guardrail();
     public String capPlain = RoadPalette.DEFAULT.capPlain();
     public String capSolid = RoadPalette.DEFAULT.capSolid();
     public String capDash = RoadPalette.DEFAULT.capDash();
@@ -75,6 +77,7 @@ public class RoadSettings {
     public int turnLine = 0;
     public int turnCross = 0;
     public int turnDiag = 0;
+    public int turnGuard = 0;
     public int turnCornerOut = 0;       // внешний угловой блок бордюра
     public int turnCornerIn = 0;        // внутренний угловой блок бордюра
     public int turnCurbDiago = 0;       // диагональный блок бордюра
@@ -104,13 +107,13 @@ public class RoadSettings {
     public RoadSpec toSpec() {
         return new RoadSpec(preset.key, lanes, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
                 sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps,
-                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing);
+                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing, guard);
     }
 
     public RoadPalette toPalette() {
         return new RoadPalette(asphalt, line, sidewalk, curb, grass, lamp, capPlain, capSolid, capDash,
-                crosswalk, diagonal, turnSidewalk, turnLamp, turnCap, turnLine, turnCross, turnDiag,
-                turnCornerOut, turnCornerIn, turnCurbDiago);
+                crosswalk, diagonal, guardrail, turnSidewalk, turnLamp, turnCap, turnLine, turnCross, turnDiag,
+                turnCornerOut, turnCornerIn, turnCurbDiago, turnGuard);
     }
 
     public String get(Role r) {
@@ -121,6 +124,7 @@ public class RoadSettings {
             case CURB -> curb;
             case GRASS -> grass;
             case LAMP -> lamp;
+            case GUARD -> guardrail;
             case CROSSWALK -> crosswalk;
             case DIAGONAL -> diagonal;
         };
@@ -134,6 +138,7 @@ public class RoadSettings {
             case CURB -> curb = id;
             case GRASS -> grass = id;
             case LAMP -> lamp = id;
+            case GUARD -> guardrail = id;
             case CROSSWALK -> crosswalk = id;
             case DIAGONAL -> diagonal = id;
         }
@@ -176,6 +181,8 @@ public class RoadSettings {
         turnLine = Math.floorMod(turnLine, 4);
         turnCross = Math.floorMod(turnCross, 4);
         turnDiag = Math.floorMod(turnDiag, 4);
+        turnGuard = Math.floorMod(turnGuard, 4);
+        guard = clamp(guard, 0, 3);
         turnCornerOut = Math.floorMod(turnCornerOut, 4);
         turnCornerIn = Math.floorMod(turnCornerIn, 4);
         turnCurbDiago = Math.floorMod(turnCurbDiago, 4);
@@ -187,6 +194,7 @@ public class RoadSettings {
         curb = fix(curb, d.curb());
         grass = fix(grass, d.grass());
         lamp = fix(lamp, d.lamp());
+        guardrail = fix(guardrail, d.guardrail());
         capPlain = fix(capPlain, d.capPlain());
         capSolid = fix(capSolid, d.capSolid());
         capDash = fix(capDash, d.capDash());
@@ -296,6 +304,9 @@ public class RoadSettings {
         b.writeVarInt(turnLine);
         b.writeVarInt(turnCross);
         b.writeVarInt(turnDiag);
+        b.writeVarInt(turnGuard);
+        b.writeVarInt(guard);
+        b.writeUtf(guardrail);
         b.writeVarInt(turnCornerOut);
         b.writeVarInt(turnCornerIn);
         b.writeVarInt(turnCurbDiago);
@@ -355,6 +366,9 @@ public class RoadSettings {
         s.turnLine = b.readVarInt();
         s.turnCross = b.readVarInt();
         s.turnDiag = b.readVarInt();
+        s.turnGuard = b.readVarInt();
+        s.guard = b.readVarInt();
+        s.guardrail = b.readUtf();
         s.turnCornerOut = b.readVarInt();
         s.turnCornerIn = b.readVarInt();
         s.turnCurbDiago = b.readVarInt();

@@ -4,6 +4,7 @@ package com.roadforge.road;
  * Параметры дороги.
  * laneWidth - колонок асфальта в одной полосе; между полосами колонка разметки.
  * treeSpacing - шаг деревьев на газоне (разделитель, обочина), 0 - без деревьев.
+ * guard - ограждения: 0 нет, 1 по разделителю, 2 по краям, 3 везде.
  * crossEvery - шаг пешеходных переходов на дороге в блоках (0 - без переходов).
  */
 public record RoadSpec(
@@ -26,7 +27,8 @@ public record RoadSpec(
         int parkDepth,
         int parkPitch,
         int crossEvery,
-        int treeSpacing
+        int treeSpacing,
+        int guard
 ) {
     public int dashPeriod() {
         return Math.max(1, dashOn + dashGap);
@@ -35,12 +37,12 @@ public record RoadSpec(
     public RoadSpec withEndCaps(boolean caps) {
         return new RoadSpec(preset, lanes, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
                 sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, caps,
-                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing);
+                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing, guard);
     }
 
     public RoadSpec withLanes(int l) {
         return new RoadSpec(preset, l, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
                 sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps,
-                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing);
+                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing, guard);
     }
 }

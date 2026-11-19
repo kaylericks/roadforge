@@ -185,6 +185,9 @@ public class RoadScreen extends Screen {
         step(sec, "Обочина (газон)", String.valueOf(s.shoulderWidth),
                 () -> s.shoulderWidth = Math.max(0, s.shoulderWidth - 1),
                 () -> s.shoulderWidth = Math.min(4, s.shoulderWidth + 1));
+        if (mode != BuildMode.ROUNDABOUT) {
+            seg(sec, "Ограждения", List.of("Нет", "Разд.", "Края", "Всё"), s.guard, i -> s.guard = i);
+        }
         step(sec, "Фонари, шаг (0=нет)", String.valueOf(s.lampSpacing),
                 () -> s.lampSpacing = s.lampSpacing <= 6 ? 0 : s.lampSpacing - 2,
                 () -> s.lampSpacing = s.lampSpacing == 0 ? 6 : Math.min(48, s.lampSpacing + 2));
@@ -289,6 +292,7 @@ public class RoadScreen extends Screen {
         turnStep("Бордюр: внешний угол", s.turnCornerOut, v -> s.turnCornerOut = v);
         turnStep("Бордюр: внутр. угол", s.turnCornerIn, v -> s.turnCornerIn = v);
         turnStep("Бордюр: диагональ", s.turnCurbDiago, v -> s.turnCurbDiago = v);
+        turnStep("Ограждение", s.turnGuard, v -> s.turnGuard = v);
         turnStep("Фонарь", s.turnLamp, v -> s.turnLamp = v);
         turnStep("Торец-уклон", s.turnCap, v -> s.turnCap = v);
         turnStep("Линия", s.turnLine, v -> s.turnLine = v);

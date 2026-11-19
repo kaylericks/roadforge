@@ -183,6 +183,7 @@ public final class BendPlan {
                 Surfaces.Cell c;
                 if (g.cs.medianEdge(idx)) {
                     c = Surfaces.Cell.paving(toRoad);
+                    c.medianEdge = true;
                 } else if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
                     c = Surfaces.Cell.paving(toRoad);
                 } else {
@@ -230,6 +231,17 @@ public final class BendPlan {
                 Surfaces.Cell c = grid[x - x0][z - z0];
                 if (c != null) {
                     out.add(new Placement(new BlockPos(x, cy, z), Surfaces.finish(c, pal)));
+                }
+            }
+        }
+
+        if (g.spec.guard() > 0) {
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    Surfaces.Cell c = grid[x - x0][z - z0];
+                    if (Guards.wants(g.spec.guard(), c)) {
+                        out.add(new Placement(new BlockPos(x, cy + 1, z), pal.guardState(c.face)));
+                    }
                 }
             }
         }

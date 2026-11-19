@@ -262,7 +262,7 @@ public final class PathPlan {
                 for (int z = cz0 - reach; z <= cz0 + reach; z++) {
                     double vx = x + 0.5 - sm.x;
                     double vz = z + 0.5 - sm.z;
-                    double dist = Math.hypot(vx, vz);
+                    double dist = vx * vx + vz * vz;      // квадрат расстояния: для сравнения корень не нужен
                     double lateral = vx * rx + vz * rz;
                     int idx = ref + (int) Math.round(lateral);
                     if (idx < 0 || idx >= w) {
@@ -312,6 +312,7 @@ public final class PathPlan {
             Surfaces.Cell cell;
             if (cs.medianEdge(c.idx)) {
                 cell = Surfaces.Cell.paving(Direction.NORTH);
+                cell.medianEdge = true;
             } else if (kind == Kind.SIDEWALK_L || kind == Kind.SIDEWALK_R) {
                 // дорога лежит в сторону оси: слева от оси - вправо, справа - влево
                 double rx = -c.tz;
@@ -366,6 +367,18 @@ public final class PathPlan {
                 Surfaces.Cell c = grid[x - x0][z - z0];
                 if (c != null) {
                     out.add(new Placement(new BlockPos(x, ys[x - x0][z - z0], z), Surfaces.finish(c, pal)));
+                }
+            }
+        }
+
+        // 3a. ограждения на бордюре
+        if (spec.guard() > 0) {
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    Surfaces.Cell c = grid[x - x0][z - z0];
+                    if (Guards.wants(spec.guard(), c)) {
+                        out.add(new Placement(new BlockPos(x, ys[x - x0][z - z0] + 1, z), pal.guardState(c.face)));
+                    }
                 }
             }
         }

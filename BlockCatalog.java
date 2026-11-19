@@ -24,6 +24,8 @@ public final class BlockCatalog {
                     "minecraft:quartz_block", "minecraft:light_gray_concrete", "minecraft:bricks"),
             Role.GRASS, List.of("minecraft:grass_block", "minecraft:moss_block", "minecraft:dirt",
                     "minecraft:coarse_dirt", "minecraft:podzol"),
+            Role.GUARD, List.of("minecraft:iron_bars", "minecraft:stone_brick_wall", "minecraft:andesite_wall",
+                    "minecraft:polished_blackstone_wall"),
             Role.LAMP, List.of("minecraft:end_rod", "minecraft:lantern", "minecraft:sea_lantern", "minecraft:glowstone"),
             Role.CROSSWALK, List.of("minecraft:white_concrete", "minecraft:quartz_block", "minecraft:light_gray_concrete"),
             Role.DIAGONAL, List.of("minecraft:white_concrete", "minecraft:light_gray_concrete")
@@ -63,6 +65,7 @@ public final class BlockCatalog {
             case CURB -> p.matches("trottoir_(stone|stone_brick|brick|sandstone|smooth_stone)");
             case GRASS -> p.equals("trottoir_grass");
             case LAMP -> p.startsWith("lampe_");
+            case GUARD -> p.startsWith("glissiere");
             case CROSSWALK -> p.startsWith("passage_pieton");
             case DIAGONAL -> p.startsWith("ligne_diagonale");
         };

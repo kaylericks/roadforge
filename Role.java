@@ -9,7 +9,8 @@ public enum Role {
     GRASS("Газон"),
     LAMP("Фонарь"),
     CROSSWALK("Зебра"),
-    DIAGONAL("Диагональ");
+    DIAGONAL("Диагональ"),
+    GUARD("Ограждение");
 
     public final String title;
 

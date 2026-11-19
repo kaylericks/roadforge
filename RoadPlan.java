@@ -75,6 +75,18 @@ public final class RoadPlan {
             }
         }
 
+        // 3a. ограждения на бордюре
+        if (spec.guard() > 0) {
+            for (int s = 0; s < length; s++) {
+                for (int i = 0; i < w; i++) {
+                    if (Guards.wants(spec.guard(), g[s][i])) {
+                        out.add(new Placement(at(start, dir, right, s, i - cs.ref()).above(off[s] + 1),
+                                pal.guardState(g[s][i].face)));
+                    }
+                }
+            }
+        }
+
         // 3b. деревья по центру каждой полосы газона (разделитель, обочина)
         if (spec.treeSpacing() > 0) {
             int sp = spec.treeSpacing();
@@ -139,7 +151,9 @@ public final class RoadPlan {
             return Surfaces.Cell.paving(k == Kind.SIDEWALK_L ? right : right.getOpposite());
         }
         if (cs.medianEdge(i)) {
-            return Surfaces.Cell.paving(towardRoad);      // бордюр по краям газона разделителя
+            Surfaces.Cell edge = Surfaces.Cell.paving(towardRoad);      // бордюр по краям газона разделителя
+            edge.medianEdge = true;
+            return edge;
         }
         if (isParking(k) && parkTapered(depth, s, length)) {
             return Surfaces.Cell.paving(towardRoad);
