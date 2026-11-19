@@ -11,6 +11,7 @@ public final class ClientState {
     private static RoadSettings settings;
     private static BlockPos a;
     private static BlockPos b;
+    private static java.util.List<BlockPos> path = new java.util.ArrayList<>();
 
     public static RoadSettings settings() {
         if (settings == null) {
@@ -27,12 +28,30 @@ public final class ClientState {
         Net.CHANNEL.sendToServer(new ApplySettingsPacket(settings().copy()));
     }
 
-    public static void setPoints(BlockPos pa, BlockPos pb) {
+    public static void setPoints(BlockPos pa, BlockPos pb, java.util.List<BlockPos> pp) {
         a = pa;
         b = pb;
+        path = new java.util.ArrayList<>(pp);
+    }
+
+    public static BlockPos pointA() {
+        return a;
+    }
+
+    public static BlockPos pointB() {
+        return b;
+    }
+
+    public static java.util.List<BlockPos> path() {
+        return path;
     }
 
     public static String pointsText() {
+        if (settings().mode == com.roadforge.road.BuildMode.PATH) {
+            return path.isEmpty() ? "Точек нет: ПКМ жезлом (можно по воздуху)"
+                    : "Точек: " + path.size() + (path.size() < 2 ? " — добавь ещё" : "  длина ~"
+                    + com.roadforge.road.PathPlan.lengthOf(path, settings()) + " бл.");
+        }
         if (settings().mode.isCentered()) {
             return a == null ? "Центр не выбран: ПКМ жезлом по блоку" : "Центр: " + a.toShortString();
         }

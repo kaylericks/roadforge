@@ -87,12 +87,14 @@ public final class RoundaboutPlan {
                     c = Surfaces.Cell.paving(towardCenter(dx, dz).getOpposite());
                     c.island = true;
                     c.forceCurb = d > g.rIn - 1;      // внешний ряд острова - бордюр, внутри газон
+                    c.trim = true;
                 } else if (d <= g.rOut) {
                     c = ringCell(g, st, pal, dx, dz, d);
                 } else {
                     c = armCell(g, st, pal, dx, dz);
                     if (c == null && d <= g.rPlaza) {
                         c = Surfaces.Cell.paving(towardCenter(dx, dz));
+                        c.trim = true;
                         c.lat = -2;    // метка площадки (для фонарей)
                         c.tag = (int) Math.floor((Math.atan2(dz, dx) + Math.PI) * g.rPlaza);
                     }
@@ -224,6 +226,8 @@ public final class RoundaboutPlan {
         Surfaces.Cell c;
         if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
             c = Surfaces.Cell.paving(idx < cs.ref() ? latPlus : latPlus.getOpposite());
+        } else if (cs.medianEdge(idx)) {
+            c = Surfaces.Cell.paving(latPlus);                          // бордюр у газона разделителя
         } else if (idx < cs.roadFirst() || idx > cs.roadLast()) {
             c = Surfaces.Cell.road(Kind.GRASS, pal.grassState());       // газон-обочина
         } else {
@@ -256,6 +260,7 @@ public final class RoundaboutPlan {
         }
         c.tag = along;
         c.lat = idx;
+        c.median = !c.paving && c.kind == Kind.GRASS && idx >= cs.roadFirst() && idx <= cs.roadLast();
         if (c.paving && spec.lampSpacing() > 0 && cs.lampLeft() >= 0 && along > g.rPlaza) {
             if (idx == cs.lampLeft()) {
                 c.lamp = 1;
@@ -291,6 +296,12 @@ public final class RoundaboutPlan {
             }
         }
         return sb.toString().trim();
+    }
+
+    /** Радиусы: остров, внешний край кольца, внешний край площадки. */
+    public static int[] radii(RoadSettings st) {
+        Geo g = new Geo(st);
+        return new int[]{g.rIn, g.rOut, g.rPlaza};
     }
 
     /** Размер сетки для оценки числа блоков. */

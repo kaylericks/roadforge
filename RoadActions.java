@@ -1,11 +1,13 @@
 package com.roadforge.build;
 
 import com.roadforge.RoadConfig;
+import com.roadforge.network.Net;
 import com.roadforge.player.PlayerRoadState;
 import com.roadforge.road.BuildMode;
 import com.roadforge.road.CrossSection;
 import com.roadforge.road.BendPlan;
 import com.roadforge.road.IntersectionPlan;
+import com.roadforge.road.PathPlan;
 import com.roadforge.road.Placement;
 import com.roadforge.road.RoadPlan;
 import com.roadforge.road.RoundaboutPlan;
@@ -23,9 +25,10 @@ public final class RoadActions {
     public static final int CLEAR_HEIGHT = 3;
 
     public static String describe(PlayerRoadState st) {
-        if (st.settings.mode == BuildMode.CURVE) {
-            return "Изгиб: " + st.settings.lanes + " пол. · радиус дуги " + BendPlan.radius(st.settings)
-                    + " · сначала вдоль " + (st.settings.curveFirstX ? "X" : "Z");
+        if (st.settings.mode == BuildMode.PATH) {
+            CrossSection pcs = CrossSection.build(st.spec());
+            return "Путь: " + st.path.size() + " т. · ~" + PathPlan.lengthOf(st.path, st.settings) + " бл. · полос "
+                    + st.spec().lanes() + " · ширина " + pcs.width() + " бл.";
         }
         if (st.settings.mode == BuildMode.ROUNDABOUT) {
             return "Кольцо: остров R" + st.settings.islandRadius + " · полос кольца " + st.settings.ringLanes
@@ -61,8 +64,8 @@ public final class RoadActions {
             buildIntersection(player, st);
         } else if (st.settings.mode == BuildMode.ROUNDABOUT) {
             buildRoundabout(player, st);
-        } else if (st.settings.mode == BuildMode.CURVE) {
-            buildCurve(player, st);
+        } else if (st.settings.mode == BuildMode.PATH) {
+            buildPath(player, st);
         } else {
             buildRoad(player, st);
         }
@@ -115,52 +118,74 @@ public final class RoadActions {
                 + IntersectionPlan.armEnds(st.a, st.settings)));
     }
 
-    /** Дорога из точки A в точку B с одним поворотом на 90° (два прямых участка и дуга). */
-    private static void buildCurve(ServerPlayer player, PlayerRoadState st) {
-        if (!st.hasBoth()) {
-            player.sendSystemMessage(Component.literal("§cСначала отметь начало и конец жезлом (ПКМ по блоку)."));
+    /** Дорога по ломаной: любые углы, на изломах дуга. */
+    private static void buildPath(ServerPlayer player, PlayerRoadState st) {
+        if (st.path.size() < 2) {
+            player.sendSystemMessage(Component.literal("§cНужно минимум две точки пути (ПКМ жезлом)."));
             return;
         }
-        RoadSettings cfg = st.settings;
-        BlockPos a = st.a;
-        BlockPos b = st.b;
-        if (a.getX() == b.getX() || a.getZ() == b.getZ()) {
-            player.sendSystemMessage(Component.literal(
-                    "§cТочки лежат на одной линии: для прямой дороги используй режим «Дорога»."));
+        int len = PathPlan.lengthOf(st.path, st.settings);
+        if (len > RoadConfig.MAX_ROAD_LENGTH.get()) {
+            player.sendSystemMessage(Component.literal("§cСлишком длинный путь: " + len
+                    + " (максимум " + RoadConfig.MAX_ROAD_LENGTH.get() + ")."));
             return;
         }
-        BlockPos corner;
-        Direction d1;
-        Direction d2;
-        int dist1;
-        int dist2;
-        if (cfg.curveFirstX) {
-            corner = new BlockPos(b.getX(), a.getY(), a.getZ());
-            d1 = a.getX() > b.getX() ? Direction.EAST : Direction.WEST;
-            d2 = b.getZ() > a.getZ() ? Direction.SOUTH : Direction.NORTH;
-            dist1 = Math.abs(a.getX() - b.getX());
-            dist2 = Math.abs(b.getZ() - a.getZ());
-        } else {
-            corner = new BlockPos(a.getX(), a.getY(), b.getZ());
-            d1 = a.getZ() > b.getZ() ? Direction.SOUTH : Direction.NORTH;
-            d2 = b.getX() > a.getX() ? Direction.EAST : Direction.WEST;
-            dist1 = Math.abs(a.getZ() - b.getZ());
-            dist2 = Math.abs(b.getX() - a.getX());
-        }
-        int rho = BendPlan.radius(cfg);
-        if (dist1 < rho || dist2 < rho) {
-            player.sendSystemMessage(Component.literal("§cУчастки слишком короткие для поворота: каждый должен быть не короче "
-                    + rho + " бл. (сейчас " + dist1 + " и " + dist2 + "). Отодвинь точки или уменьши «Радиус углов»."));
-            return;
-        }
-        List<Placement> plan = BendPlan.generate(corner, d1, d2, dist1, dist2, false, cfg, CLEAR_HEIGHT);
+        st.settings.sanitize();
+        List<Placement> plan = PathPlan.generate(st.path, st.settings, CLEAR_HEIGHT);
         if (plan.size() > RoadConfig.MAX_BLOCKS_PER_BUILD.get()) {
             player.sendSystemMessage(Component.literal("§cСлишком много блоков (" + plan.size()
                     + "), лимит " + RoadConfig.MAX_BLOCKS_PER_BUILD.get() + "."));
             return;
         }
-        BuildManager.enqueue(player.serverLevel(), player.getUUID(), plan, true, "Изгиб построен");
+        BuildManager.enqueue(player.serverLevel(), player.getUUID(), plan, true, "Путь построен");
         player.sendSystemMessage(Component.literal("§eСтрою: " + describe(st)));
+        // последняя точка остаётся началом следующего участка
+        BlockPos last = st.path.get(st.path.size() - 1);
+        st.path.clear();
+        st.path.add(last);
+        Net.sendPoints(player, st);
+    }
+
+    /** Клик жезлом по точке: ставит начало / конец / центр / очередную точку пути. */
+    public static void click(ServerPlayer player, BlockPos pos) {
+        PlayerRoadState st = PlayerRoadState.of(player);
+        BuildMode mode = st.settings.mode;
+        if (mode.isCentered()) {
+            st.a = pos;
+            st.b = null;
+            player.displayClientMessage(Component.literal("§bЦентр: " + pos.toShortString()
+                    + " §7(Shift+ПКМ — построить)"), true);
+        } else if (mode == BuildMode.PATH) {
+            st.path.add(pos);
+            player.displayClientMessage(Component.literal("§b" + describe(st)
+                    + " §7(Shift+ПКМ — построить, ЛКМ — убрать точку)"), true);
+        } else if (st.a == null || st.b != null) {
+            st.a = pos;
+            st.b = null;
+            player.displayClientMessage(Component.literal("§bДорога: начало " + pos.toShortString()
+                    + ". Теперь укажи конец."), true);
+        } else {
+            st.b = pos;
+            player.displayClientMessage(Component.literal("§b" + describe(st)
+                    + " §7(Shift+ПКМ — построить)"), true);
+        }
+        Net.sendPoints(player, st);
+    }
+
+    /** ЛКМ жезлом: убирает последнюю отмеченную точку. */
+    public static void removeLastPoint(ServerPlayer player) {
+        PlayerRoadState st = PlayerRoadState.of(player);
+        if (st.settings.mode == BuildMode.PATH) {
+            if (!st.path.isEmpty()) {
+                st.path.remove(st.path.size() - 1);
+            }
+        } else if (st.b != null) {
+            st.b = null;
+        } else {
+            st.a = null;
+        }
+        Net.sendPoints(player, st);
+        player.displayClientMessage(Component.literal("§7Точка убрана."), true);
     }
 
     private static void buildRoundabout(ServerPlayer player, PlayerRoadState st) {

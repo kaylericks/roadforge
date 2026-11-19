@@ -31,7 +31,10 @@ public record RoadPalette(
         int turnCap,
         int turnLine,
         int turnCross,
-        int turnDiag
+        int turnDiag,
+        int turnCornerOut,
+        int turnCornerIn,
+        int turnCurbDiago
 ) {
     public static final RoadPalette DEFAULT = new RoadPalette(
             "routemod:asphalte",              // низкий асфальт (10/16), как и линии
@@ -45,7 +48,7 @@ public record RoadPalette(
             "roadmarks:pente_1_pointille",
             "routemod:passage_pieton",
             "routemod:ligne_diagonale",
-            0, 0, 0, 0, 0, 0
+            0, 0, 0, 0, 0, 0, 0, 0, 0
     );
 
     private static final Map<String, Optional<Block>> CACHE = new HashMap<>();
@@ -86,6 +89,39 @@ public record RoadPalette(
     /** Бордюр: один блок у кромки (f - направление в сторону проезжей части). */
     public BlockState curbState(Direction f) {
         return state(curb, turn(f, turnSidewalk));
+    }
+
+    /** Id угловых вариантов бордюра, выведенный из выбранного блока (null - у блока нет вариантов). */
+    private String variantId(String kind) {
+        String prefix = "routemod:trottoir_";
+        if (curb == null || !curb.startsWith(prefix)) {
+            return null;
+        }
+        String suffix = curb.substring(prefix.length());
+        String id = switch (kind) {
+            case "outer" -> "routemod:coin_exterieur_trottoir_" + suffix;
+            case "inner" -> "routemod:coin_interieur_trottoir";
+            default -> "routemod:trottoir_diago_" + suffix;
+        };
+        return CACHE.computeIfAbsent(id, BlockLookup::find).isPresent() ? id : null;
+    }
+
+    /** Выпуклый угол тротуара (дорога с двух сторон: между f и f по часовой). */
+    public BlockState curbOuterState(Direction f) {
+        String id = variantId("outer");
+        return id == null ? curbState(f) : state(id, turn(f, turnCornerOut));
+    }
+
+    /** Вогнутый угол (дорога по диагонали между f и f по часовой). */
+    public BlockState curbInnerState(Direction f) {
+        String id = variantId("inner");
+        return id == null ? curbState(f) : state(id, turn(f, turnCornerIn));
+    }
+
+    /** Участок бордюра под 45° (дорога между f и f по часовой). */
+    public BlockState curbDiagoState(Direction f) {
+        String id = variantId("diago");
+        return id == null ? curbOuterState(f) : state(id, turn(f, turnCurbDiago));
     }
 
     public BlockState grassState() {

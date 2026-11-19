@@ -97,7 +97,8 @@ public final class RoadPlan {
 
     /** Колонка парковки у торца превращается в тротуар по диагонали (въезд «косым срезом»). */
     private static boolean parkTapered(int depth, int s, int length) {
-        return s < depth + 1 || s > length - 2 - depth;
+        int off = 1 + depth / 2;          // короткий срез: 2 колонки вглубь на каждые 2 блока длины
+        return s < off || s > length - 1 - off;
     }
 
     private static Surfaces.Cell cell(CrossSection cs, int i, int s, int length, Direction dir, Direction right,
@@ -109,10 +110,15 @@ public final class RoadPlan {
         if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
             return Surfaces.Cell.paving(k == Kind.SIDEWALK_L ? right : right.getOpposite());
         }
+        if (cs.medianEdge(i)) {
+            return Surfaces.Cell.paving(towardRoad);      // бордюр по краям газона разделителя
+        }
         if (isParking(k) && parkTapered(depth, s, length)) {
             return Surfaces.Cell.paving(towardRoad);
         }
-        return Surfaces.Cell.road(k, surfaceState(k, depth, leftSide, s, length, dir, right, spec, pal));
+        Surfaces.Cell cell = Surfaces.Cell.road(k, surfaceState(k, depth, leftSide, s, length, dir, right, spec, pal));
+        cell.median = k == Kind.GRASS && i >= cs.roadFirst() && i <= cs.roadLast();
+        return cell;
     }
 
     /** Пешеходные переходы посреди дороги: зебра, стоп-линии, пониженный бордюр, «островок» на разделителе. */
@@ -185,8 +191,8 @@ public final class RoadPlan {
                                            Direction dir, Direction right, RoadSpec spec, RoadPalette pal) {
         int pd = Math.max(1, spec.parkDepth());
         int pitch = Math.max(2, spec.parkPitch());
-        int first = pd;
-        int last = length - 1 - pd;
+        int first = 1 + (pd - 1) / 2;
+        int last = length - 1 - first;
         int stalls = Math.max(0, last - first) / pitch;
         int sp = s - first;
         boolean boundary = sp >= 0 && sp <= stalls * pitch && sp % pitch == 0;
@@ -203,7 +209,7 @@ public final class RoadPlan {
                 // диагональные линии: со сдвигом на 1 ряд на каждую колонку вглубь
                 int shift = leftSide ? -depth : depth;
                 boolean on = Math.floorMod(sp - shift, pitch) == 0;
-                Direction f = leftSide ? right : dir;      // зеркально для другой стороны
+                Direction f = right;                       // обе стороны наклонены одинаково (как односторонняя парковка)
                 return on ? pal.diagonalState(f) : pal.asphaltState(dir);
             }
             default:

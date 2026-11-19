@@ -55,9 +55,6 @@ public class RoadSettings {
     public int islandRadius = 6;        // радиус центрального острова
     public int ringLanes = 2;           // полос на кольце (1 или 2)
 
-    // --- изгиб (поворот между двумя точками) ---
-    public boolean curveFirstX = true;  // первый участок от точки A идёт вдоль X (иначе вдоль Z)
-
     // --- блоки ---
     public String asphalt = RoadPalette.DEFAULT.asphalt();
     public String line = RoadPalette.DEFAULT.line();
@@ -78,6 +75,9 @@ public class RoadSettings {
     public int turnLine = 0;
     public int turnCross = 0;
     public int turnDiag = 0;
+    public int turnCornerOut = 0;       // внешний угловой блок бордюра
+    public int turnCornerIn = 0;        // внутренний угловой блок бордюра
+    public int turnCurbDiago = 0;       // диагональный блок бордюра
 
     public RoadSettings() {
         applyPreset(RoadPreset.CITY);
@@ -109,7 +109,8 @@ public class RoadSettings {
 
     public RoadPalette toPalette() {
         return new RoadPalette(asphalt, line, sidewalk, curb, grass, lamp, capPlain, capSolid, capDash,
-                crosswalk, diagonal, turnSidewalk, turnLamp, turnCap, turnLine, turnCross, turnDiag);
+                crosswalk, diagonal, turnSidewalk, turnLamp, turnCap, turnLine, turnCross, turnDiag,
+                turnCornerOut, turnCornerIn, turnCurbDiago);
     }
 
     public String get(Role r) {
@@ -175,6 +176,9 @@ public class RoadSettings {
         turnLine = Math.floorMod(turnLine, 4);
         turnCross = Math.floorMod(turnCross, 4);
         turnDiag = Math.floorMod(turnDiag, 4);
+        turnCornerOut = Math.floorMod(turnCornerOut, 4);
+        turnCornerIn = Math.floorMod(turnCornerIn, 4);
+        turnCurbDiago = Math.floorMod(turnCurbDiago, 4);
 
         RoadPalette d = RoadPalette.DEFAULT;
         asphalt = fix(asphalt, d.asphalt());
@@ -273,7 +277,6 @@ public class RoadSettings {
         b.writeBoolean(crosswalks);
         b.writeVarInt(islandRadius);
         b.writeVarInt(ringLanes);
-        b.writeBoolean(curveFirstX);
 
         b.writeUtf(asphalt);
         b.writeUtf(line);
@@ -293,6 +296,9 @@ public class RoadSettings {
         b.writeVarInt(turnLine);
         b.writeVarInt(turnCross);
         b.writeVarInt(turnDiag);
+        b.writeVarInt(turnCornerOut);
+        b.writeVarInt(turnCornerIn);
+        b.writeVarInt(turnCurbDiago);
     }
 
     public static RoadSettings decode(FriendlyByteBuf b) {
@@ -330,7 +336,6 @@ public class RoadSettings {
         s.crosswalks = b.readBoolean();
         s.islandRadius = b.readVarInt();
         s.ringLanes = b.readVarInt();
-        s.curveFirstX = b.readBoolean();
 
         s.asphalt = b.readUtf();
         s.line = b.readUtf();
@@ -350,6 +355,9 @@ public class RoadSettings {
         s.turnLine = b.readVarInt();
         s.turnCross = b.readVarInt();
         s.turnDiag = b.readVarInt();
+        s.turnCornerOut = b.readVarInt();
+        s.turnCornerIn = b.readVarInt();
+        s.turnCurbDiago = b.readVarInt();
         return s;
     }
 }

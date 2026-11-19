@@ -21,6 +21,7 @@ public final class IntersectionPlan {
         BlockState state;
         Direction face;
         boolean curb;
+        boolean median;
 
         C(Kind kind, BlockState state, Direction face) {
             this.kind = kind;
@@ -130,11 +131,13 @@ public final class IntersectionPlan {
                     Kind k = normalize(ka);
                     cell = new C(k, RoadPlan.surfaceState(k, g.csA.depths().get(ia), ia < g.csA.ref(), s, 100000,
                             Direction.EAST, Direction.SOUTH, g.specA, pal), null);
+                    cell.median = k == Kind.GRASS;
                 } else if (rwB) {
                     int s = z < g.az0 ? g.az0 - 1 - z : z - g.az1 - 1;
                     Kind k = normalize(kb);
                     cell = new C(k, RoadPlan.surfaceState(k, g.csB.depths().get(ib), ib < g.csB.ref(), s, 100000,
                             Direction.NORTH, Direction.EAST, g.specB, pal), null);
+                    cell.median = k == Kind.GRASS;
                 } else if (isSidewalk(ka) || isSidewalk(kb)) {
                     Direction face;
                     if (isSidewalk(ka)) {
@@ -204,36 +207,22 @@ public final class IntersectionPlan {
             }
         }
 
-        // ---------- 4. направление бордюра: в сторону соседнего асфальта ----------
-        Direction[] order = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
-        for (int x = x0; x <= x1; x++) {
-            for (int z = z0; z <= z1; z++) {
-                C c = grid[x - x0][z - z0];
-                if (c == null || c.kind != Kind.SIDEWALK_L) {
+        // ---------- 4. бордюр: общий разбор (прямой, угловые, диагональный) ----------
+        Surfaces.Cell[][] mirror = new Surfaces.Cell[grid.length][];
+        for (int i = 0; i < grid.length; i++) {
+            mirror[i] = new Surfaces.Cell[grid[i].length];
+            for (int j = 0; j < grid[i].length; j++) {
+                C c = grid[i][j];
+                if (c == null) {
                     continue;
                 }
-                Direction toRoad = null;
-                boolean ramp = false;
-                for (Direction d : order) {
-                    C n = get(grid, x0, z0, x + d.getStepX(), z + d.getStepZ());
-                    if (n == null) {
-                        continue;
-                    }
-                    if (n.kind == Kind.CROSSWALK) {
-                        ramp = true;                       // у зебры бордюр убираем (съезд)
-                        if (toRoad == null) {
-                            toRoad = d;
-                        }
-                    } else if (isRoadKind(n.kind) && toRoad == null) {
-                        toRoad = d;
-                    }
-                }
-                if (toRoad != null) {
-                    c.face = toRoad;
-                }
-                c.curb = toRoad != null && !ramp;
+                mirror[i][j] = c.kind == Kind.SIDEWALK_L
+                        ? Surfaces.Cell.paving(c.face != null ? c.face : Direction.NORTH)
+                        : Surfaces.Cell.road(c.kind, c.state);
+                mirror[i][j].median = c.median;
             }
         }
+        Surfaces.resolve(mirror, Direction.EAST, Direction.SOUTH);
 
         // ---------- 5. список блоков ----------
         List<Placement> out = new ArrayList<>();
@@ -255,8 +244,9 @@ public final class IntersectionPlan {
                     continue;
                 }
                 BlockState bs = c.state;
-                if (c.kind == Kind.SIDEWALK_L) {
-                    bs = c.curb ? pal.curbState(c.face) : pal.sidewalkState(c.face);
+                Surfaces.Cell mc = mirror[x - x0][z - z0];
+                if (mc != null && mc.paving) {
+                    bs = Surfaces.finish(mc, pal);
                 }
                 out.add(new Placement(new BlockPos(x, g.cy, z), bs));
             }

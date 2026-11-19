@@ -33,30 +33,11 @@ public class RoadWandItem extends Item {
             return InteractionResult.FAIL;
         }
 
-        PlayerRoadState st = PlayerRoadState.of(player);
-        BlockPos pos = ctx.getClickedPos();
-
         if (player.isShiftKeyDown()) {
             RoadActions.build(player);
-            return InteractionResult.SUCCESS;
-        }
-
-        if (st.settings.mode.isCentered()) {
-            st.a = pos;
-            st.b = null;
-            player.displayClientMessage(Component.literal("§bЦентр: " + pos.toShortString()
-                    + " §7(Shift+ПКМ — построить)"), true);
-        } else if (st.a == null || st.b != null) {
-            st.a = pos;
-            st.b = null;
-            player.displayClientMessage(Component.literal("§bДорога: ПКМ — начало " + pos.toShortString()
-                    + ". Теперь укажи конец."), true);
         } else {
-            st.b = pos;
-            player.displayClientMessage(Component.literal("§b" + RoadActions.describe(st)
-                    + " §7(Shift+ПКМ — построить)"), true);
+            RoadActions.click(player, ctx.getClickedPos());
         }
-        Net.sendPoints(player, st);
         return InteractionResult.SUCCESS;
     }
 }

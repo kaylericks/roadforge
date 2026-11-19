@@ -181,7 +181,9 @@ public final class BendPlan {
                 }
                 Kind k = g.cs.cols().get(idx);
                 Surfaces.Cell c;
-                if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
+                if (g.cs.medianEdge(idx)) {
+                    c = Surfaces.Cell.paving(toRoad);
+                } else if (k == Kind.SIDEWALK_L || k == Kind.SIDEWALK_R) {
                     c = Surfaces.Cell.paving(toRoad);
                 } else {
                     if (k == Kind.PARK_EDGE || k == Kind.PARK_BAY) {
@@ -193,8 +195,15 @@ public final class BendPlan {
                         Direction perp = (alpha >= rho ? d1 : d2).getClockWise();
                         c = Surfaces.Cell.road(Kind.LINE_SOLID, pal.lineState(perp));
                     } else {
-                        c = Surfaces.Cell.road(k, RoadPlan.surfaceState(k, 0, false, sPath, 100000,
-                                line, line, g.spec, pal));
+                        BlockState bs;
+                        if (alpha < rho && beta < rho && (k == Kind.LINE_SOLID || k == Kind.LINE_DASH)) {
+                            // на дуге касательная перпендикулярна радиусу: вектор (-dz, dx)
+                            bs = LineMarks.cell(k, -(z - oz), x - ox, sPath, g.spec, pal);
+                        } else {
+                            bs = RoadPlan.surfaceState(k, 0, false, sPath, 100000, line, line, g.spec, pal);
+                        }
+                        c = Surfaces.Cell.road(k, bs);
+                        c.median = k == Kind.GRASS && idx >= g.cs.roadFirst() && idx <= g.cs.roadLast();
                     }
                 }
                 c.tag = sPath;
