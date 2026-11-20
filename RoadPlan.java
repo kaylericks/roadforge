@@ -104,6 +104,18 @@ public final class RoadPlan {
             }
         }
 
+        // 3d. маркеры светильников тоннеля
+        if (spec.tunnelHeight() > 0) {
+            Set<Long> seen = Piers.newSet();
+            for (int s = 2; s < length - 2; s += 1) {
+                if (s % 8 != 4) {
+                    continue;
+                }
+                BlockPos p = at(start, dir, right, s, 0);
+                Piers.markLight(out, seen, p.getX(), start.getY() + off[s], p.getZ());
+            }
+        }
+
         // 3b. деревья по центру каждой полосы газона (разделитель, обочина)
         if (spec.treeSpacing() > 0) {
             int sp = spec.treeSpacing();

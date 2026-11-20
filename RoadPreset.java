@@ -39,9 +39,9 @@ public enum RoadPreset {
         ParkType pt = ParkType.NONE;
         return switch (this) {
             //                preset      lanes           lw  marks edge   dblCtr   median sw shd lamps on gap caps  park  cross
-            case CITY ->     new RoadSpec("city",     l,            3, true,  false, l >= 4, 0, 3, 0, 12, 1, 3, true, pt, false, false, 2, 6, 0, 0, 0, 12);
-            case ARTERIAL -> new RoadSpec("arterial", Math.max(4, l), 3, true,  false, false,  3, 3, 0, 16, 1, 3, true, pt, false, false, 2, 6, 0, 0, 0, 12);
-            case DACHA ->    new RoadSpec("dacha",    2,            3, false, false, false,  0, 0, 1, 0,  1, 3, true, pt, false, false, 2, 6, 0, 0, 0, 12);
+            case CITY ->     new RoadSpec("city",     l,            3, true,  false, l >= 4, 0, 3, 0, 12, 1, 3, true, pt, false, false, 2, 6, 0, 0, 0, 12, 0);
+            case ARTERIAL -> new RoadSpec("arterial", Math.max(4, l), 3, true,  false, false,  3, 3, 0, 16, 1, 3, true, pt, false, false, 2, 6, 0, 0, 0, 12, 0);
+            case DACHA ->    new RoadSpec("dacha",    2,            3, false, false, false,  0, 0, 1, 0,  1, 3, true, pt, false, false, 2, 6, 0, 0, 0, 12, 0);
         };
     }
 }

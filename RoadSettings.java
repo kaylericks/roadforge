@@ -46,6 +46,7 @@ public class RoadSettings {
     public int lotStrip = 3;            // газонная полоса между спаренными рядами (0 - нет)
     public int lotIsland = 0;           // остров с деревом вместо места через каждые N мест (0 - нет)
     public int lotAngle = -1;           // угол рядов, градусы (-1 - по первой стороне контура)
+    public int tunnelHeight = 0;        // высота тоннеля внутри (0 - без облицовки)
     public int pierSpacing = 12;        // шаг опор моста (0 - нет)
     public int guard = 0;               // ограждения: 0 нет, 1 разделитель, 2 края, 3 везде
     public int treeSpacing = 0;         // шаг деревьев на газоне и острове кольца (0 - нет)
@@ -116,7 +117,7 @@ public class RoadSettings {
     public RoadSpec toSpec() {
         return new RoadSpec(preset.key, lanes, laneWidth, markings, edgeLines, doubleCenter, medianWidth,
                 sidewalkWidth, shoulderWidth, lampSpacing, dashOn, dashGap, endCaps,
-                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing, guard, pierSpacing);
+                parkType, parkLeft, parkRight, parkDepth, parkPitch, crossEvery, treeSpacing, guard, pierSpacing, tunnelHeight);
     }
 
     public RoadPalette toPalette() {
@@ -199,6 +200,7 @@ public class RoadSettings {
         lotStrip = clamp(lotStrip, 0, 5);
         lotIsland = lotIsland <= 0 ? 0 : clamp(lotIsland, 3, 16);
         lotAngle = lotAngle < 0 ? -1 : Math.floorMod(lotAngle, 180);
+        tunnelHeight = tunnelHeight <= 0 ? 0 : clamp(tunnelHeight, 4, 10);
         pierSpacing = pierSpacing <= 0 ? 0 : clamp(pierSpacing, 6, 40);
         turnCornerOut = Math.floorMod(turnCornerOut, 4);
         turnCornerIn = Math.floorMod(turnCornerIn, 4);
@@ -324,6 +326,7 @@ public class RoadSettings {
         b.writeVarInt(turnGuard);
         b.writeVarInt(guard);
         b.writeVarInt(pierSpacing);
+        b.writeVarInt(tunnelHeight);
         b.writeVarInt(lotStyle);
         b.writeVarInt(lotStall);
         b.writeVarInt(lotDepth);
@@ -394,6 +397,7 @@ public class RoadSettings {
         s.turnGuard = b.readVarInt();
         s.guard = b.readVarInt();
         s.pierSpacing = b.readVarInt();
+        s.tunnelHeight = b.readVarInt();
         s.lotStyle = b.readVarInt();
         s.lotStall = b.readVarInt();
         s.lotDepth = b.readVarInt();

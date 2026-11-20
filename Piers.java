@@ -25,6 +25,14 @@ final class Piers {
         }
     }
 
+    /** Маркер светильника тоннеля: Foundation поставит фонарь в потолок, если над колонкой тоннель. */
+    static void markLight(List<Placement> out, Set<Long> seen, int x, int deckY, int z) {
+        BlockPos p = new BlockPos(x, deckY + 1, z);
+        if (seen.add(p.asLong())) {
+            out.add(new Placement(p, Foundation.LIGHT_MARK));
+        }
+    }
+
     static Set<Long> newSet() {
         return new HashSet<>();
     }

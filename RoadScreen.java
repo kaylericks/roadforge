@@ -199,6 +199,9 @@ public class RoadScreen extends Screen {
                 () -> s.lampSpacing = s.lampSpacing <= 6 ? 0 : s.lampSpacing - 2,
                 () -> s.lampSpacing = s.lampSpacing == 0 ? 6 : Math.min(48, s.lampSpacing + 2));
         if (mode == BuildMode.ROAD || mode == BuildMode.PATH) {
+            step(sec, "Тоннель, высота (0=нет)", String.valueOf(s.tunnelHeight),
+                    () -> s.tunnelHeight = s.tunnelHeight <= 4 ? 0 : s.tunnelHeight - 1,
+                    () -> s.tunnelHeight = s.tunnelHeight == 0 ? 5 : Math.min(10, s.tunnelHeight + 1));
             step(sec, "Опоры моста, шаг (0=нет)", String.valueOf(s.pierSpacing),
                     () -> s.pierSpacing = s.pierSpacing <= 6 ? 0 : s.pierSpacing - 2,
                     () -> s.pierSpacing = s.pierSpacing == 0 ? 6 : Math.min(40, s.pierSpacing + 2));

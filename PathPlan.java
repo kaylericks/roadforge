@@ -402,6 +402,19 @@ public final class PathPlan {
             }
         }
 
+        // 3d. маркеры светильников тоннеля (по оси, каждые 8 блоков)
+        if (spec.tunnelHeight() > 0) {
+            Set<Long> seen = Piers.newSet();
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    Surfaces.Cell c = grid[x - x0][z - z0];
+                    if (c != null && c.lat == cs.ref() && c.tag >= 2 && Math.floorMod(c.tag, 8) == 4) {
+                        Piers.markLight(out, seen, x, ys[x - x0][z - z0], z);
+                    }
+                }
+            }
+        }
+
         // 4. фонари по краям профиля, шаг - вдоль пути
         if (spec.lampSpacing() > 0 && cs.lampLeft() >= 0) {
             int sp = spec.lampSpacing();

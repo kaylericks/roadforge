@@ -64,6 +64,15 @@ public final class RoadActions {
     public static void build(ServerPlayer player) {
         PlayerRoadState st = PlayerRoadState.of(player);
         st.settings.sanitize();
+        com.roadforge.build.Foundation.tunnelHeight = st.settings.tunnelHeight;
+        try {
+            dispatchBuild(player, st);
+        } finally {
+            com.roadforge.build.Foundation.tunnelHeight = 0;
+        }
+    }
+
+    private static void dispatchBuild(ServerPlayer player, PlayerRoadState st) {
         if (st.settings.mode == BuildMode.INTERSECTION) {
             buildIntersection(player, st);
         } else if (st.settings.mode == BuildMode.ROUNDABOUT) {

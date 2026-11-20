@@ -32,9 +32,20 @@ public final class Foundation {
 
     /** Маркер плана: «здесь начинается опора моста» (в мир не ставится). */
     public static final BlockState PIER_MARK = Blocks.STRUCTURE_VOID.defaultBlockState();
+    /** Маркер плана: «здесь светильник тоннеля» (в мир не ставится). */
+    public static final BlockState LIGHT_MARK = Blocks.BARRIER.defaultBlockState();
+
+    /**
+     * Высота тоннеля внутри (0 - без облицовки). Задаётся на время одной постройки перед постановкой в очередь:
+     * там, где над дорогой твёрдая земля, делается проход, облицовка стен и потолка и светильники.
+     */
+    public static volatile int tunnelHeight = 0;
 
     private static final BlockState BASE = Blocks.BLACK_CONCRETE.defaultBlockState();
     private static final BlockState PIER = Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState();
+    private static final BlockState LINING = Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState();
+    private static final BlockState LANTERN = Blocks.SEA_LANTERN.defaultBlockState();
+    private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 
     private static boolean empty(ServerLevel level, BlockPos pos) {
         BlockState st = level.getBlockState(pos);
@@ -46,11 +57,16 @@ public final class Foundation {
         Map<Long, BlockPos> lowest = new HashMap<>();
         Set<Long> taken = new HashSet<>();
         List<BlockPos> piers = new ArrayList<>();
+        List<BlockPos> lights = new ArrayList<>();
         List<Placement> clean = new ArrayList<>(plan.size());
         for (Placement p : plan) {
             BlockPos pos = p.pos();
             if (p.state() == PIER_MARK || p.state().equals(PIER_MARK)) {
                 piers.add(pos);
+                continue;
+            }
+            if (p.state() == LIGHT_MARK || p.state().equals(LIGHT_MARK)) {
+                lights.add(pos);
                 continue;
             }
             clean.add(p);
@@ -112,8 +128,67 @@ public final class Foundation {
                 }
             }
         }
+        if (tunnelHeight > 0) {
+            addTunnel(level, lowest, taken, lights, out);
+        }
         out.addAll(clean);
         return out;
+    }
+
+    private static long colKey(int x, int z) {
+        return ((long) x << 32) ^ (z & 0xFFFFFFFFL);
+    }
+
+    /** Облицовка тоннеля там, где над дорогой твёрдая земля: проход, стены, потолок, светильники. */
+    private static void addTunnel(ServerLevel level, Map<Long, BlockPos> lowest, Set<Long> taken,
+                                  List<BlockPos> lights, List<Placement> out) {
+        int hgt = tunnelHeight;
+        Set<Long> covered = new HashSet<>();
+        for (Map.Entry<Long, BlockPos> e : lowest.entrySet()) {
+            BlockPos top = e.getValue();
+            BlockPos ceil = new BlockPos(top.getX(), top.getY() + hgt + 1, top.getZ());
+            if (ceil.getY() < level.getMaxBuildHeight() && level.isLoaded(ceil) && !empty(level, ceil)) {
+                covered.add(e.getKey());
+            }
+        }
+        int[][] around = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        Set<Long> done = new HashSet<>();
+        for (long key : covered) {
+            BlockPos top = lowest.get(key);
+            int x = top.getX();
+            int z = top.getZ();
+            int deck = top.getY();
+            for (int y = deck + 1; y <= deck + hgt; y++) {
+                BlockPos pos = new BlockPos(x, y, z);
+                if (!taken.contains(pos.asLong())) {
+                    out.add(new Placement(pos, AIR));
+                }
+            }
+            BlockPos ceil = new BlockPos(x, deck + hgt + 1, z);
+            if (done.add(ceil.asLong())) {
+                out.add(new Placement(ceil, LINING));
+            }
+            for (int[] d : around) {
+                int nx = x + d[0];
+                int nz = z + d[1];
+                if (lowest.containsKey(colKey(nx, nz))) {
+                    continue;                         // соседняя колонка - тоже дорога
+                }
+                for (int y = deck; y <= deck + hgt + 1; y++) {
+                    BlockPos np = new BlockPos(nx, y, nz);
+                    if (level.isLoaded(np) && !empty(level, np) && done.add(np.asLong())) {
+                        out.add(new Placement(np, LINING));    // стена только там, где здесь земля
+                    }
+                }
+            }
+        }
+        for (BlockPos m : lights) {
+            long key = colKey(m.getX(), m.getZ());
+            BlockPos top = lowest.get(key);
+            if (top != null && covered.contains(key)) {
+                out.add(new Placement(new BlockPos(m.getX(), top.getY() + hgt + 1, m.getZ()), LANTERN));
+            }
+        }
     }
 
     private Foundation() {}
