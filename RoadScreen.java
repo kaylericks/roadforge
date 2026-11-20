@@ -11,6 +11,7 @@ import com.roadforge.road.BuildMode;
 import com.roadforge.road.CrossSection;
 import com.roadforge.road.IntersectionPlan;
 import com.roadforge.road.ParkType;
+import com.roadforge.road.ParkingPlan;
 import com.roadforge.road.PathPlan;
 import com.roadforge.road.Placement;
 import com.roadforge.road.RoadPlan;
@@ -163,6 +164,12 @@ public class RoadScreen extends Screen {
         RoadSpec spec = s.toSpec();
         CrossSection cs = CrossSection.build(spec);
 
+        if (mode == BuildMode.PARKING) {
+            addLotRows();
+            addBlockRows();
+            return;
+        }
+
         // --- дорога ---
         String sec = mode == BuildMode.ROAD ? "ДОРОГА" : (mode == BuildMode.PATH ? "ДОРОГА (ПУТЬ)" : "ГЛАВНАЯ ДОРОГА");
         header(sec);
@@ -276,7 +283,10 @@ public class RoadScreen extends Screen {
             toggle(cx, "Зебры и стоп-линии", s.crosswalks, () -> s.crosswalks = !s.crosswalks);
         }
 
-        // --- блоки ---
+        addBlockRows();
+    }
+
+    private void addBlockRows() {
         String bs = "БЛОКИ";
         header(bs);
         for (Role role : Role.values()) {
@@ -303,6 +313,40 @@ public class RoadScreen extends Screen {
         turnStep("Линия", s.turnLine, v -> s.turnLine = v);
         turnStep("Зебра", s.turnCross, v -> s.turnCross = v);
         turnStep("Диагональ (парковка)", s.turnDiag, v -> s.turnDiag = v);
+    }
+
+    private void addLotRows() {
+        String ls = "СТОЯНКА";
+        header(ls);
+        seg(ls, "Тип мест", List.of("Перпенд.", "Косые 45°", "Паралл."), s.lotStyle, i -> {
+            s.lotStyle = i;
+            s.lotDepth = i == 2 ? 2 : 5;
+            s.lotStall = i == 2 ? 6 : 3;
+        });
+        step(ls, "Ширина места", String.valueOf(s.lotStall),
+                () -> s.lotStall = Math.max(2, s.lotStall - 1), () -> s.lotStall = Math.min(6, s.lotStall + 1));
+        step(ls, "Глубина ряда", String.valueOf(s.lotDepth),
+                () -> s.lotDepth = Math.max(2, s.lotDepth - 1), () -> s.lotDepth = Math.min(8, s.lotDepth + 1));
+        step(ls, "Ширина проезда", String.valueOf(s.lotAisle),
+                () -> s.lotAisle = Math.max(3, s.lotAisle - 1), () -> s.lotAisle = Math.min(12, s.lotAisle + 1));
+        step(ls, "Газонная полоса между рядами", String.valueOf(s.lotStrip),
+                () -> s.lotStrip = Math.max(0, s.lotStrip - 1), () -> s.lotStrip = Math.min(5, s.lotStrip + 1));
+        step(ls, "Остров каждые N мест (0=нет)", String.valueOf(s.lotIsland),
+                () -> s.lotIsland = s.lotIsland <= 3 ? 0 : s.lotIsland - 1,
+                () -> s.lotIsland = s.lotIsland == 0 ? 3 : Math.min(16, s.lotIsland + 1));
+        step(ls, "Угол рядов", s.lotAngle < 0 ? "по 1-й стороне" : s.lotAngle + "°",
+                () -> s.lotAngle = s.lotAngle < 0 ? 165 : (s.lotAngle <= 0 ? -1 : s.lotAngle - 15),
+                () -> s.lotAngle = s.lotAngle < 0 ? 0 : (s.lotAngle >= 165 ? -1 : s.lotAngle + 15));
+        step(ls, "Тротуар по краю (0=нет)", String.valueOf(s.sidewalkWidth),
+                () -> s.sidewalkWidth = Math.max(0, s.sidewalkWidth - 1),
+                () -> s.sidewalkWidth = Math.min(4, s.sidewalkWidth + 1));
+        step(ls, "Фонари, шаг (0=нет)", String.valueOf(s.lampSpacing),
+                () -> s.lampSpacing = s.lampSpacing <= 6 ? 0 : s.lampSpacing - 2,
+                () -> s.lampSpacing = s.lampSpacing == 0 ? 6 : Math.min(48, s.lampSpacing + 2));
+        step(ls, "Деревья на островах (0=нет)", String.valueOf(s.treeSpacing),
+                () -> s.treeSpacing = s.treeSpacing <= 5 ? 0 : s.treeSpacing - 1,
+                () -> s.treeSpacing = s.treeSpacing == 0 ? 8 : Math.min(32, s.treeSpacing + 1));
+        note(ls, "Точки - углы стоянки (любая форма), ПКМ добавляет, Shift+ПКМ строит.");
     }
 
     private void changed() {
@@ -385,25 +429,27 @@ public class RoadScreen extends Screen {
                 {"Дорога", "две точки, прямая"},
                 {"Путь", "ломаная, любые углы"},
                 {"Перекрёсток", "центр + ветки, поворот"},
-                {"Кольцо", "остров, ветки, переходы"}
+                {"Кольцо", "остров, ветки, переходы"},
+                {"Парковка", "контур, ряды мест"}
         };
-        BuildMode[] modes = {BuildMode.ROAD, BuildMode.PATH, BuildMode.INTERSECTION, BuildMode.ROUNDABOUT};
+        BuildMode[] modes = {BuildMode.ROAD, BuildMode.PATH, BuildMode.INTERSECTION, BuildMode.ROUNDABOUT,
+                BuildMode.PARKING};
         for (int i = 0; i < tools.length; i++) {
             final BuildMode m = modes[i];
             boolean sel = s.mode == m;
-            boolean hot = mx >= x + 6 && mx < x + LEFT_W - 6 && my >= y && my < y + 34;
-            box(g, x + 6, y, x + LEFT_W - 6, y + 34, sel ? 0xFF22345F : (hot ? COL_ROW_HOT : COL_ROW));
+            boolean hot = mx >= x + 6 && mx < x + LEFT_W - 6 && my >= y && my < y + 30;
+            box(g, x + 6, y, x + LEFT_W - 6, y + 30, sel ? 0xFF22345F : (hot ? COL_ROW_HOT : COL_ROW));
             if (sel) {
-                box(g, x + 6, y, x + 9, y + 34, COL_ACCENT);
+                box(g, x + 6, y, x + 9, y + 30, COL_ACCENT);
             }
-            g.drawString(font, tools[i][0], x + 16, y + 6, COL_TEXT);
-            g.drawString(font, font.plainSubstrByWidth(tools[i][1], LEFT_W - 28), x + 16, y + 19, COL_DIM);
-            hits.add(new Hit(x + 6, y, x + LEFT_W - 6, y + 34, () -> {
+            g.drawString(font, tools[i][0], x + 16, y + 4, COL_TEXT);
+            g.drawString(font, font.plainSubstrByWidth(tools[i][1], LEFT_W - 28), x + 16, y + 16, COL_DIM);
+            hits.add(new Hit(x + 6, y, x + LEFT_W - 6, y + 30, () -> {
                 s.mode = m;
                 scroll = 0;
                 changed();
             }));
-            y += 38;
+            y += 33;
         }
         y += 6;
         g.drawString(font, "ЖЕЗЛ", x + 8, y, COL_DIM);
@@ -574,6 +620,10 @@ public class RoadScreen extends Screen {
             RoadSettings ps = s.copy();
             ps.armLength = Math.min(ps.armLength, 8);
             raw = RoundaboutPlan.generate(BlockPos.ZERO, ps, 0);
+        } else if (s.mode == BuildMode.PARKING) {
+            RoadSettings ps = s.copy();
+            raw = ParkingPlan.generate(java.util.List.of(new BlockPos(0, 0, 0), new BlockPos(32, 0, 0),
+                    new BlockPos(32, 0, 12), new BlockPos(22, 0, 24), new BlockPos(0, 0, 24)), ps, 0).blocks;
         } else if (s.mode == BuildMode.PATH) {
             RoadSettings ps = s.copy();
             int leg = (int) Math.ceil(PathPlan.axisRadius(ps)) + 10;

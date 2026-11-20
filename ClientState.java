@@ -47,6 +47,11 @@ public final class ClientState {
     }
 
     public static String pointsText() {
+        if (settings().mode == com.roadforge.road.BuildMode.PARKING) {
+            return path.isEmpty() ? "Точек нет: ПКМ жезлом по углам стоянки"
+                    : "Точек: " + path.size() + (path.size() < 3 ? " — нужно минимум 3" : "  площадь ~"
+                    + (int) com.roadforge.road.ParkingPlan.area(path) + " бл.²");
+        }
         if (settings().mode == com.roadforge.road.BuildMode.PATH) {
             return path.isEmpty() ? "Точек нет: ПКМ жезлом (можно по воздуху)"
                     : "Точек: " + path.size() + (path.size() < 2 ? " — добавь ещё" : "  длина ~"

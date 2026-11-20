@@ -7,6 +7,7 @@ import com.roadforge.road.BuildMode;
 import com.roadforge.road.CrossSection;
 import com.roadforge.road.BendPlan;
 import com.roadforge.road.IntersectionPlan;
+import com.roadforge.road.ParkingPlan;
 import com.roadforge.road.PathPlan;
 import com.roadforge.road.Placement;
 import com.roadforge.road.RoadPlan;
@@ -25,6 +26,9 @@ public final class RoadActions {
     public static final int CLEAR_HEIGHT = 3;
 
     public static String describe(PlayerRoadState st) {
+        if (st.settings.mode == BuildMode.PARKING) {
+            return "Парковка: " + st.path.size() + " т. · площадь ~" + (int) ParkingPlan.area(st.path) + " бл.²";
+        }
         if (st.settings.mode == BuildMode.PATH) {
             CrossSection pcs = CrossSection.build(st.spec());
             return "Путь: " + st.path.size() + " т. · ~" + PathPlan.lengthOf(st.path, st.settings) + " бл. · полос "
@@ -66,6 +70,8 @@ public final class RoadActions {
             buildRoundabout(player, st);
         } else if (st.settings.mode == BuildMode.PATH) {
             buildPath(player, st);
+        } else if (st.settings.mode == BuildMode.PARKING) {
+            buildParking(player, st);
         } else {
             buildRoad(player, st);
         }
@@ -125,6 +131,29 @@ public final class RoadActions {
                 + IntersectionPlan.armEnds(st.a, st.settings)));
     }
 
+    /** Стоянка по контуру из отмеченных точек. */
+    private static void buildParking(ServerPlayer player, PlayerRoadState st) {
+        if (st.path.size() < 3) {
+            player.sendSystemMessage(Component.literal("§cНужно минимум три точки контура (ПКМ жезлом)."));
+            return;
+        }
+        st.settings.sanitize();
+        ParkingPlan.Result res = ParkingPlan.generate(st.path, st.settings, CLEAR_HEIGHT);
+        if (res.blocks.isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cКонтур слишком большой или вырожденный."));
+            return;
+        }
+        if (res.blocks.size() > RoadConfig.MAX_BLOCKS_PER_BUILD.get()) {
+            player.sendSystemMessage(Component.literal("§cСлишком много блоков (" + res.blocks.size()
+                    + "), лимит " + RoadConfig.MAX_BLOCKS_PER_BUILD.get() + "."));
+            return;
+        }
+        BuildManager.enqueue(player.serverLevel(), player.getUUID(), res.blocks, true, "Стоянка построена");
+        player.sendSystemMessage(Component.literal("§eСтрою: " + describe(st) + " · мест ~" + res.stalls));
+        st.path.clear();
+        Net.sendPoints(player, st);
+    }
+
     /** Дорога по ломаной: любые углы, на изломах дуга. */
     private static void buildPath(ServerPlayer player, PlayerRoadState st) {
         if (st.path.size() < 2) {
@@ -167,7 +196,7 @@ public final class RoadActions {
             st.b = null;
             player.displayClientMessage(Component.literal("§bЦентр: " + pos.toShortString()
                     + " §7(Shift+ПКМ — построить)"), true);
-        } else if (mode == BuildMode.PATH) {
+        } else if (mode == BuildMode.PATH || mode == BuildMode.PARKING) {
             st.path.add(pos);
             player.displayClientMessage(Component.literal("§b" + describe(st)
                     + " §7(Shift+ПКМ — построить, ЛКМ — убрать точку)"), true);
@@ -187,7 +216,7 @@ public final class RoadActions {
     /** ЛКМ жезлом: убирает последнюю отмеченную точку. */
     public static void removeLastPoint(ServerPlayer player) {
         PlayerRoadState st = PlayerRoadState.of(player);
-        if (st.settings.mode == BuildMode.PATH) {
+        if (st.settings.mode == BuildMode.PATH || st.settings.mode == BuildMode.PARKING) {
             if (!st.path.isEmpty()) {
                 st.path.remove(st.path.size() - 1);
             }

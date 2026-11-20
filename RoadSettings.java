@@ -38,6 +38,14 @@ public class RoadSettings {
 
     // --- переходы на дороге ---
     public int crossEvery = 0;          // шаг пешеходных переходов, блоков (0 - нет)
+    // --- стоянка по контуру (режим «Парковка») ---
+    public int lotStyle = 0;            // 0 перпендикулярные места, 1 косые 45°, 2 параллельные
+    public int lotStall = 3;            // ширина места вдоль ряда
+    public int lotDepth = 5;            // глубина ряда
+    public int lotAisle = 6;            // ширина проезда между рядами
+    public int lotStrip = 3;            // газонная полоса между спаренными рядами (0 - нет)
+    public int lotIsland = 0;           // остров с деревом вместо места через каждые N мест (0 - нет)
+    public int lotAngle = -1;           // угол рядов, градусы (-1 - по первой стороне контура)
     public int pierSpacing = 12;        // шаг опор моста (0 - нет)
     public int guard = 0;               // ограждения: 0 нет, 1 разделитель, 2 края, 3 везде
     public int treeSpacing = 0;         // шаг деревьев на газоне и острове кольца (0 - нет)
@@ -184,6 +192,13 @@ public class RoadSettings {
         turnDiag = Math.floorMod(turnDiag, 4);
         turnGuard = Math.floorMod(turnGuard, 4);
         guard = clamp(guard, 0, 3);
+        lotStyle = clamp(lotStyle, 0, 2);
+        lotStall = clamp(lotStall, 2, 6);
+        lotDepth = clamp(lotDepth, 2, 8);
+        lotAisle = clamp(lotAisle, 3, 12);
+        lotStrip = clamp(lotStrip, 0, 5);
+        lotIsland = lotIsland <= 0 ? 0 : clamp(lotIsland, 3, 16);
+        lotAngle = lotAngle < 0 ? -1 : Math.floorMod(lotAngle, 180);
         pierSpacing = pierSpacing <= 0 ? 0 : clamp(pierSpacing, 6, 40);
         turnCornerOut = Math.floorMod(turnCornerOut, 4);
         turnCornerIn = Math.floorMod(turnCornerIn, 4);
@@ -309,6 +324,13 @@ public class RoadSettings {
         b.writeVarInt(turnGuard);
         b.writeVarInt(guard);
         b.writeVarInt(pierSpacing);
+        b.writeVarInt(lotStyle);
+        b.writeVarInt(lotStall);
+        b.writeVarInt(lotDepth);
+        b.writeVarInt(lotAisle);
+        b.writeVarInt(lotStrip);
+        b.writeVarInt(lotIsland);
+        b.writeVarInt(lotAngle);
         b.writeUtf(guardrail);
         b.writeVarInt(turnCornerOut);
         b.writeVarInt(turnCornerIn);
@@ -372,6 +394,13 @@ public class RoadSettings {
         s.turnGuard = b.readVarInt();
         s.guard = b.readVarInt();
         s.pierSpacing = b.readVarInt();
+        s.lotStyle = b.readVarInt();
+        s.lotStall = b.readVarInt();
+        s.lotDepth = b.readVarInt();
+        s.lotAisle = b.readVarInt();
+        s.lotStrip = b.readVarInt();
+        s.lotIsland = b.readVarInt();
+        s.lotAngle = b.readVarInt();
         s.guardrail = b.readUtf();
         s.turnCornerOut = b.readVarInt();
         s.turnCornerIn = b.readVarInt();

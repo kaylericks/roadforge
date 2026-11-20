@@ -161,6 +161,29 @@ public final class OutlinePlan {
                     o.label += " · СЛИШКОМ КРУТО";
                 }
             }
+            case PARKING -> {
+                List<BlockPos> pts = new ArrayList<>(path);
+                if (aim != null) {
+                    pts.add(aim);
+                }
+                for (BlockPos p : path) {
+                    o.posts.add(new double[]{p.getX() + 0.5, p.getZ() + 0.5});
+                }
+                if (pts.isEmpty()) {
+                    o.label = "Парковка: отметь углы";
+                    break;
+                }
+                o.y = pts.get(pts.size() - 1).getY();
+                for (int i = 0; i < pts.size(); i++) {
+                    BlockPos p = pts.get(i);
+                    BlockPos q = pts.get((i + 1) % pts.size());
+                    if (pts.size() > 1 && (i + 1 < pts.size() || pts.size() > 2)) {
+                        o.lines.add(new double[]{p.getX() + 0.5, p.getZ() + 0.5, q.getX() + 0.5, q.getZ() + 0.5});
+                    }
+                }
+                o.label = pts.size() < 3 ? "Парковка: нужно минимум 3 точки"
+                        : "Парковка: площадь ~" + (int) ParkingPlan.area(pts) + " бл.²";
+            }
             case INTERSECTION, ROUNDABOUT -> {
                 BlockPos c = a != null ? a : aim;
                 if (c == null) {
