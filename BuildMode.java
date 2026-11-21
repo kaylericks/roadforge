@@ -5,7 +5,9 @@ public enum BuildMode {
     INTERSECTION("Перекрёсток"),
     ROUNDABOUT("Кольцо"),
     PATH("Путь"),
-    PARKING("Парковка");
+    PARKING("Парковка"),
+    RIVER("Река"),
+    LAKE("Озеро");
 
     public final String title;
 

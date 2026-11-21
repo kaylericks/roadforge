@@ -45,7 +45,12 @@ public class RoadSettings {
     public int lotAisle = 6;            // ширина проезда между рядами
     public int lotStrip = 3;            // газонная полоса между спаренными рядами (0 - нет)
     public int lotIsland = 0;           // остров с деревом вместо места через каждые N мест (0 - нет)
+    public boolean lotUnderground = false;  // подземная стоянка (один этаж, въезд-пандус)
+    public int lotLevelH = 5;               // глубина этажа: от поверхности до пола
     public int lotAngle = -1;           // угол рядов, градусы (-1 - по первой стороне контура)
+    // --- реки и озёра ---
+    public int riverWidth = 9;          // ширина воды реки
+    public int riverDepth = 3;          // глубина до дна (слоёв ниже берега)
     public int tunnelHeight = 0;        // высота тоннеля внутри (0 - без облицовки)
     public int pierSpacing = 12;        // шаг опор моста (0 - нет)
     public int guard = 0;               // ограждения: 0 нет, 1 разделитель, 2 края, 3 везде
@@ -199,7 +204,10 @@ public class RoadSettings {
         lotAisle = clamp(lotAisle, 3, 12);
         lotStrip = clamp(lotStrip, 0, 5);
         lotIsland = lotIsland <= 0 ? 0 : clamp(lotIsland, 3, 16);
+        lotLevelH = clamp(lotLevelH, 4, 9);
         lotAngle = lotAngle < 0 ? -1 : Math.floorMod(lotAngle, 180);
+        riverWidth = clamp(riverWidth, 3, 41);
+        riverDepth = clamp(riverDepth, 2, 8);
         tunnelHeight = tunnelHeight <= 0 ? 0 : clamp(tunnelHeight, 4, 10);
         pierSpacing = pierSpacing <= 0 ? 0 : clamp(pierSpacing, 6, 40);
         turnCornerOut = Math.floorMod(turnCornerOut, 4);
@@ -227,6 +235,22 @@ public class RoadSettings {
 
     private static String fix(String id, String def) {
         return (id != null && BlockLookup.find(id).isPresent()) ? id : def;
+    }
+
+    /** Копия всех полей (не через Gson): для внутренних расчётов. */
+    public RoadSettings duplicate() {
+        RoadSettings c = new RoadSettings();
+        for (java.lang.reflect.Field f : RoadSettings.class.getFields()) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+                continue;
+            }
+            try {
+                f.set(c, f.get(this));
+            } catch (IllegalAccessException e) {
+                // публичные поля, сюда не попадаем
+            }
+        }
+        return c;
     }
 
     public RoadSettings copy() {
@@ -327,6 +351,8 @@ public class RoadSettings {
         b.writeVarInt(guard);
         b.writeVarInt(pierSpacing);
         b.writeVarInt(tunnelHeight);
+        b.writeVarInt(riverWidth);
+        b.writeVarInt(riverDepth);
         b.writeVarInt(lotStyle);
         b.writeVarInt(lotStall);
         b.writeVarInt(lotDepth);
@@ -334,6 +360,8 @@ public class RoadSettings {
         b.writeVarInt(lotStrip);
         b.writeVarInt(lotIsland);
         b.writeVarInt(lotAngle);
+        b.writeBoolean(lotUnderground);
+        b.writeVarInt(lotLevelH);
         b.writeUtf(guardrail);
         b.writeVarInt(turnCornerOut);
         b.writeVarInt(turnCornerIn);
@@ -398,6 +426,8 @@ public class RoadSettings {
         s.guard = b.readVarInt();
         s.pierSpacing = b.readVarInt();
         s.tunnelHeight = b.readVarInt();
+        s.riverWidth = b.readVarInt();
+        s.riverDepth = b.readVarInt();
         s.lotStyle = b.readVarInt();
         s.lotStall = b.readVarInt();
         s.lotDepth = b.readVarInt();
@@ -405,6 +435,8 @@ public class RoadSettings {
         s.lotStrip = b.readVarInt();
         s.lotIsland = b.readVarInt();
         s.lotAngle = b.readVarInt();
+        s.lotUnderground = b.readBoolean();
+        s.lotLevelH = b.readVarInt();
         s.guardrail = b.readUtf();
         s.turnCornerOut = b.readVarInt();
         s.turnCornerIn = b.readVarInt();

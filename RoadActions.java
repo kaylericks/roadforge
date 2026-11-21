@@ -9,6 +9,7 @@ import com.roadforge.road.BendPlan;
 import com.roadforge.road.IntersectionPlan;
 import com.roadforge.road.ParkingPlan;
 import com.roadforge.road.PathPlan;
+import com.roadforge.road.WaterPlan;
 import com.roadforge.road.Placement;
 import com.roadforge.road.RoadPlan;
 import com.roadforge.road.RoundaboutPlan;
@@ -26,6 +27,14 @@ public final class RoadActions {
     public static final int CLEAR_HEIGHT = 3;
 
     public static String describe(PlayerRoadState st) {
+        if (st.settings.mode == BuildMode.RIVER) {
+            return "Река: " + st.path.size() + " т. · вода " + st.settings.riverWidth + " бл., глубина "
+                    + st.settings.riverDepth;
+        }
+        if (st.settings.mode == BuildMode.LAKE) {
+            return "Озеро: " + st.path.size() + " т. · площадь ~" + (int) com.roadforge.road.ParkingPlan.area(st.path)
+                    + " бл.²";
+        }
         if (st.settings.mode == BuildMode.PARKING) {
             return "Парковка: " + st.path.size() + " т. · площадь ~" + (int) ParkingPlan.area(st.path) + " бл.²";
         }
@@ -81,6 +90,8 @@ public final class RoadActions {
             buildPath(player, st);
         } else if (st.settings.mode == BuildMode.PARKING) {
             buildParking(player, st);
+        } else if (st.settings.mode == BuildMode.RIVER || st.settings.mode == BuildMode.LAKE) {
+            buildWater(player, st);
         } else {
             buildRoad(player, st);
         }
@@ -140,6 +151,39 @@ public final class RoadActions {
                 + IntersectionPlan.armEnds(st.a, st.settings)));
     }
 
+    /** Река по точкам или озеро по контуру. */
+    private static void buildWater(ServerPlayer player, PlayerRoadState st) {
+        boolean river = st.settings.mode == BuildMode.RIVER;
+        if (st.path.size() < (river ? 2 : 3)) {
+            player.sendSystemMessage(Component.literal(river
+                    ? "§cНужно минимум две точки реки (ПКМ жезлом)."
+                    : "§cНужно минимум три точки берега озера (ПКМ жезлом)."));
+            return;
+        }
+        st.settings.sanitize();
+        List<Placement> plan = river
+                ? WaterPlan.river(st.path, st.settings, CLEAR_HEIGHT)
+                : WaterPlan.lake(st.path, st.settings, CLEAR_HEIGHT);
+        if (plan.isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cКонтур слишком большой или вырожденный."));
+            return;
+        }
+        if (plan.size() > RoadConfig.MAX_BLOCKS_PER_BUILD.get()) {
+            player.sendSystemMessage(Component.literal("§cСлишком много блоков (" + plan.size()
+                    + "), лимит " + RoadConfig.MAX_BLOCKS_PER_BUILD.get() + "."));
+            return;
+        }
+        BuildManager.enqueue(player.serverLevel(), player.getUUID(), plan, true,
+                river ? "Река построена" : "Озеро построено");
+        player.sendSystemMessage(Component.literal("§eСтрою: " + describe(st)));
+        BlockPos last = st.path.get(st.path.size() - 1);
+        st.path.clear();
+        if (river) {
+            st.path.add(last);          // следующий участок реки продолжится с последней точки
+        }
+        Net.sendPoints(player, st);
+    }
+
     /** Стоянка по контуру из отмеченных точек. */
     private static void buildParking(ServerPlayer player, PlayerRoadState st) {
         if (st.path.size() < 3) {
@@ -147,7 +191,9 @@ public final class RoadActions {
             return;
         }
         st.settings.sanitize();
-        ParkingPlan.Result res = ParkingPlan.generate(st.path, st.settings, CLEAR_HEIGHT);
+        ParkingPlan.Result res = st.settings.lotUnderground
+                ? com.roadforge.road.UndergroundPlan.generate(st.path, st.settings, CLEAR_HEIGHT)
+                : ParkingPlan.generate(st.path, st.settings, CLEAR_HEIGHT);
         if (res.blocks.isEmpty()) {
             player.sendSystemMessage(Component.literal("§cКонтур слишком большой или вырожденный."));
             return;
@@ -157,7 +203,12 @@ public final class RoadActions {
                     + "), лимит " + RoadConfig.MAX_BLOCKS_PER_BUILD.get() + "."));
             return;
         }
-        BuildManager.enqueue(player.serverLevel(), player.getUUID(), res.blocks, true, "Стоянка построена");
+        BuildManager.enqueue(player.serverLevel(), player.getUUID(), res.blocks, true,
+                st.settings.lotUnderground ? "Подземная стоянка построена" : "Стоянка построена");
+        if (st.settings.lotUnderground) {
+            player.sendSystemMessage(Component.literal("§7Въезд - пандус в начале первого проезда, у края контура "
+                    + "(с минимальным u вдоль рядов): подведи дорогу к его верхнему концу."));
+        }
         player.sendSystemMessage(Component.literal("§eСтрою: " + describe(st) + " · мест ~" + res.stalls));
         st.path.clear();
         Net.sendPoints(player, st);
@@ -205,7 +256,8 @@ public final class RoadActions {
             st.b = null;
             player.displayClientMessage(Component.literal("§bЦентр: " + pos.toShortString()
                     + " §7(Shift+ПКМ — построить)"), true);
-        } else if (mode == BuildMode.PATH || mode == BuildMode.PARKING) {
+        } else if (mode == BuildMode.PATH || mode == BuildMode.PARKING || mode == BuildMode.RIVER
+                || mode == BuildMode.LAKE) {
             st.path.add(pos);
             player.displayClientMessage(Component.literal("§b" + describe(st)
                     + " §7(Shift+ПКМ — построить, ЛКМ — убрать точку)"), true);
@@ -225,7 +277,8 @@ public final class RoadActions {
     /** ЛКМ жезлом: убирает последнюю отмеченную точку. */
     public static void removeLastPoint(ServerPlayer player) {
         PlayerRoadState st = PlayerRoadState.of(player);
-        if (st.settings.mode == BuildMode.PATH || st.settings.mode == BuildMode.PARKING) {
+        if (st.settings.mode == BuildMode.PATH || st.settings.mode == BuildMode.PARKING
+                || st.settings.mode == BuildMode.RIVER || st.settings.mode == BuildMode.LAKE) {
             if (!st.path.isEmpty()) {
                 st.path.remove(st.path.size() - 1);
             }

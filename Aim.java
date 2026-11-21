@@ -23,7 +23,8 @@ public final class Aim {
     /** Последняя отмеченная точка, от высоты которой считается плоскость; null - точек ещё нет. */
     public static BlockPos anchor() {
         BuildMode mode = ClientState.settings().mode;
-        if (mode == BuildMode.PATH || mode == BuildMode.PARKING) {
+        if (mode == BuildMode.PATH || mode == BuildMode.PARKING || mode == BuildMode.RIVER
+                || mode == BuildMode.LAKE) {
             return ClientState.path().isEmpty() ? null : ClientState.path().get(ClientState.path().size() - 1);
         }
         if (mode == BuildMode.ROAD) {

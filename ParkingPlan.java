@@ -24,7 +24,7 @@ public final class ParkingPlan {
 
     private static final int GRASS_CELL = 1;
 
-    private static double[][] polygon(List<BlockPos> pts) {
+    static double[][] polygon(List<BlockPos> pts) {
         List<double[]> p = new ArrayList<>();
         for (BlockPos b : pts) {
             double x = b.getX() + 0.5;
@@ -47,7 +47,7 @@ public final class ParkingPlan {
         return p.toArray(new double[0][]);
     }
 
-    private static boolean inside(double[][] poly, double x, double z) {
+    static boolean inside(double[][] poly, double x, double z) {
         boolean in = false;
         for (int i = 0, j = poly.length - 1; i < poly.length; j = i++) {
             double xi = poly[i][0];
@@ -62,7 +62,7 @@ public final class ParkingPlan {
     }
 
     /** Расстояние от точки до границы и положение вдоль периметра ближайшей точки. */
-    private static double[] edgeInfo(double[][] poly, double x, double z) {
+    static double[] edgeInfo(double[][] poly, double x, double z) {
         double best = Double.MAX_VALUE;
         double bestS = 0;
         double acc = 0;

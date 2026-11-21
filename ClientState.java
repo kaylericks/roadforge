@@ -47,6 +47,12 @@ public final class ClientState {
     }
 
     public static String pointsText() {
+        if (settings().mode == com.roadforge.road.BuildMode.RIVER || settings().mode == com.roadforge.road.BuildMode.LAKE) {
+            boolean river = settings().mode == com.roadforge.road.BuildMode.RIVER;
+            int need = river ? 2 : 3;
+            return path.isEmpty() ? (river ? "Точек нет: ПКМ жезлом вдоль русла" : "Точек нет: ПКМ жезлом по берегу")
+                    : "Точек: " + path.size() + (path.size() < need ? " — нужно минимум " + need : "");
+        }
         if (settings().mode == com.roadforge.road.BuildMode.PARKING) {
             return path.isEmpty() ? "Точек нет: ПКМ жезлом по углам стоянки"
                     : "Точек: " + path.size() + (path.size() < 3 ? " — нужно минимум 3" : "  площадь ~"

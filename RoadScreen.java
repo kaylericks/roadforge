@@ -19,6 +19,7 @@ import com.roadforge.road.RoadPreset;
 import com.roadforge.road.RoadSettings;
 import com.roadforge.road.RoadSpec;
 import com.roadforge.road.RoundaboutPlan;
+import com.roadforge.road.WaterPlan;
 import com.roadforge.road.Role;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -166,6 +167,11 @@ public class RoadScreen extends Screen {
 
         if (mode == BuildMode.PARKING) {
             addLotRows();
+            addBlockRows();
+            return;
+        }
+        if (mode == BuildMode.RIVER || mode == BuildMode.LAKE) {
+            addWaterRows(mode == BuildMode.RIVER);
             addBlockRows();
             return;
         }
@@ -318,9 +324,34 @@ public class RoadScreen extends Screen {
         turnStep("Диагональ (парковка)", s.turnDiag, v -> s.turnDiag = v);
     }
 
+    private void addWaterRows(boolean river) {
+        String ws = river ? "РЕКА" : "ОЗЕРО";
+        header(ws);
+        if (river) {
+            step(ws, "Ширина воды (нечёт.)", String.valueOf(s.riverWidth),
+                    () -> s.riverWidth = Math.max(3, s.riverWidth - 2), () -> s.riverWidth = Math.min(41, s.riverWidth + 2));
+        }
+        step(ws, "Глубина", String.valueOf(s.riverDepth),
+                () -> s.riverDepth = Math.max(2, s.riverDepth - 1), () -> s.riverDepth = Math.min(8, s.riverDepth + 1));
+        step(ws, "Берег (тротуар)", String.valueOf(Math.max(1, s.sidewalkWidth)),
+                () -> s.sidewalkWidth = Math.max(1, s.sidewalkWidth - 1),
+                () -> s.sidewalkWidth = Math.min(8, Math.max(1, s.sidewalkWidth) + 1));
+        step(ws, "Фонари, шаг (0=нет)", String.valueOf(s.lampSpacing),
+                () -> s.lampSpacing = s.lampSpacing <= 6 ? 0 : s.lampSpacing - 2,
+                () -> s.lampSpacing = s.lampSpacing == 0 ? 6 : Math.min(48, s.lampSpacing + 2));
+        note(ws, river ? "Точки вдоль русла: ПКМ добавляет, Shift+ПКМ строит. Уровень воды по первой точке."
+                : "Точки по берегу (минимум 3). Уровень воды по первой точке.");
+    }
+
     private void addLotRows() {
         String ls = "СТОЯНКА";
         header(ls);
+        seg(ls, "Расположение", List.of("На земле", "Под землёй"), s.lotUnderground ? 1 : 0,
+                i -> s.lotUnderground = i == 1);
+        if (s.lotUnderground) {
+            step(ls, "Глубина пола", String.valueOf(s.lotLevelH),
+                    () -> s.lotLevelH = Math.max(4, s.lotLevelH - 1), () -> s.lotLevelH = Math.min(9, s.lotLevelH + 1));
+        }
         seg(ls, "Тип мест", List.of("Перпенд.", "Косые 45°", "Паралл."), s.lotStyle, i -> {
             s.lotStyle = i;
             s.lotDepth = i == 2 ? 2 : 5;
@@ -433,10 +464,12 @@ public class RoadScreen extends Screen {
                 {"Путь", "ломаная, любые углы"},
                 {"Перекрёсток", "центр + ветки, поворот"},
                 {"Кольцо", "остров, ветки, переходы"},
-                {"Парковка", "контур, ряды мест"}
+                {"Парковка", "контур, ряды мест"},
+                {"Река", "по точкам, берега"},
+                {"Озеро", "по контуру, берега"}
         };
         BuildMode[] modes = {BuildMode.ROAD, BuildMode.PATH, BuildMode.INTERSECTION, BuildMode.ROUNDABOUT,
-                BuildMode.PARKING};
+                BuildMode.PARKING, BuildMode.RIVER, BuildMode.LAKE};
         for (int i = 0; i < tools.length; i++) {
             final BuildMode m = modes[i];
             boolean sel = s.mode == m;
@@ -454,16 +487,19 @@ public class RoadScreen extends Screen {
             }));
             y += 33;
         }
-        y += 6;
-        g.drawString(font, "ЖЕЗЛ", x + 8, y, COL_DIM);
-        y += 14;
-        String[] help = {"ПКМ - точка (можно", "целиться в воздух)", "Shift+ПКМ - построить", "ЛКМ - убрать точку",
-                "Клавиша K - это меню"};
-        for (String line : help) {
-            g.drawString(font, line, x + 8, y, 0xFFB5BCC8);
-            y += 11;
+        if (y + 6 + 14 + 5 * 11 + 8 + 20 < height - 44) {
+            y += 6;
+            g.drawString(font, "ЖЕЗЛ", x + 8, y, COL_DIM);
+            y += 14;
+            String[] help = {"ПКМ - точка (можно", "целиться в воздух)", "Shift+ПКМ - построить", "ЛКМ - убрать точку",
+                    "Клавиша K - это меню"};
+            for (String line : help) {
+                g.drawString(font, line, x + 8, y, 0xFFB5BCC8);
+                y += 11;
+            }
+            y += 8;
+
         }
-        y += 8;
         button(g, x + 6, y, LEFT_W - 12, 20, "Сбросить точки", COL_ROW, mx, my,
                 () -> Net.CHANNEL.sendToServer(new ActionPacket(ActionPacket.Action.CLEAR)));
     }
@@ -627,6 +663,14 @@ public class RoadScreen extends Screen {
             RoadSettings ps = s.copy();
             raw = ParkingPlan.generate(java.util.List.of(new BlockPos(0, 0, 0), new BlockPos(32, 0, 0),
                     new BlockPos(32, 0, 12), new BlockPos(22, 0, 24), new BlockPos(0, 0, 24)), ps, 0).blocks;
+        } else if (s.mode == BuildMode.RIVER) {
+            RoadSettings ps = s.copy();
+            raw = WaterPlan.river(java.util.List.of(new BlockPos(0, 0, 0), new BlockPos(22, 0, 0),
+                    new BlockPos(40, 0, 18)), ps, 0);
+        } else if (s.mode == BuildMode.LAKE) {
+            RoadSettings ps = s.copy();
+            raw = WaterPlan.lake(java.util.List.of(new BlockPos(0, 0, 0), new BlockPos(26, 0, 3),
+                    new BlockPos(32, 0, 20), new BlockPos(10, 0, 28), new BlockPos(-4, 0, 14)), ps, 0);
         } else if (s.mode == BuildMode.PATH) {
             RoadSettings ps = s.copy();
             int leg = (int) Math.ceil(PathPlan.axisRadius(ps)) + 10;
@@ -663,8 +707,9 @@ public class RoadScreen extends Screen {
                 world.put(new BlockPos(x, 0, z), grass);
             }
         }
+        BlockState waterView = Blocks.LIGHT_BLUE_CONCRETE.defaultBlockState();   // вода в превью - голубой блок
         for (Placement p : raw) {
-            world.put(p.pos(), p.state());
+            world.put(p.pos(), p.state().getBlock() == Blocks.WATER ? waterView : p.state());
         }
 
         cache = new ArrayList<>(world.size());

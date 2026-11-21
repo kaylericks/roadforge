@@ -53,7 +53,7 @@ final class Surfaces {
 
     static boolean isRoad(Kind k) {
         return k == Kind.ASPHALT || k == Kind.LINE_SOLID || k == Kind.LINE_DASH
-                || k == Kind.PARK_EDGE || k == Kind.PARK_BAY;
+                || k == Kind.PARK_EDGE || k == Kind.PARK_BAY || k == Kind.WATER;
     }
 
     static boolean isRoadOrZebra(Kind k) {

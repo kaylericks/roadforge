@@ -161,6 +161,70 @@ public final class OutlinePlan {
                     o.label += " · СЛИШКОМ КРУТО";
                 }
             }
+            case RIVER -> {
+                List<BlockPos> pts = new ArrayList<>(path);
+                if (aim != null) {
+                    pts.add(aim);
+                }
+                for (BlockPos p : path) {
+                    o.posts.add(new double[]{p.getX() + 0.5, p.getZ() + 0.5});
+                }
+                if (pts.isEmpty()) {
+                    o.label = "Река: отметь точки вдоль русла";
+                    break;
+                }
+                o.y = pts.get(0).getY();
+                if (pts.size() < 2) {
+                    o.label = "Река: добавь ещё точку";
+                    break;
+                }
+                PathPlan.Centerline cl = PathPlan.centerline(pts, WaterPlan.axisRadius(st));
+                if (cl.samples.size() < 2) {
+                    o.label = "Река: добавь ещё точку";
+                    break;
+                }
+                double half = st.riverWidth / 2 + 0.5;
+                double bankEdge = half + Math.max(1, st.sidewalkWidth);
+                double[][] pl = new double[4][];
+                List<PathPlan.Sample> sm = cl.samples;
+                for (int i = 0; i < sm.size(); i += 3) {
+                    PathPlan.Sample s = sm.get(i);
+                    double[][] cur = {
+                            {s.x + s.tz * half, s.z - s.tx * half}, {s.x - s.tz * half, s.z + s.tx * half},
+                            {s.x + s.tz * bankEdge, s.z - s.tx * bankEdge}, {s.x - s.tz * bankEdge, s.z + s.tx * bankEdge}};
+                    if (pl[0] != null) {
+                        for (int k = 0; k < 4; k++) {
+                            o.lines.add(new double[]{pl[k][0], pl[k][1], cur[k][0], cur[k][1]});
+                        }
+                    }
+                    pl = cur;
+                }
+                o.label = "Река: " + (int) Math.round(cl.length) + " м · вода " + st.riverWidth + " бл. · глубина "
+                        + st.riverDepth;
+            }
+            case LAKE -> {
+                List<BlockPos> pts = new ArrayList<>(path);
+                if (aim != null) {
+                    pts.add(aim);
+                }
+                for (BlockPos p : path) {
+                    o.posts.add(new double[]{p.getX() + 0.5, p.getZ() + 0.5});
+                }
+                if (pts.isEmpty()) {
+                    o.label = "Озеро: отметь точки по берегу";
+                    break;
+                }
+                o.y = pts.get(0).getY();
+                for (int i = 0; i < pts.size(); i++) {
+                    BlockPos p = pts.get(i);
+                    BlockPos q = pts.get((i + 1) % pts.size());
+                    if (pts.size() > 1 && (i + 1 < pts.size() || pts.size() > 2)) {
+                        o.lines.add(new double[]{p.getX() + 0.5, p.getZ() + 0.5, q.getX() + 0.5, q.getZ() + 0.5});
+                    }
+                }
+                o.label = pts.size() < 3 ? "Озеро: нужно минимум 3 точки"
+                        : "Озеро: площадь ~" + (int) ParkingPlan.area(pts) + " бл.²";
+            }
             case PARKING -> {
                 List<BlockPos> pts = new ArrayList<>(path);
                 if (aim != null) {
@@ -182,7 +246,8 @@ public final class OutlinePlan {
                     }
                 }
                 o.label = pts.size() < 3 ? "Парковка: нужно минимум 3 точки"
-                        : "Парковка: площадь ~" + (int) ParkingPlan.area(pts) + " бл.²";
+                        : (st.lotUnderground ? "Подземная парковка: площадь ~" : "Парковка: площадь ~")
+                        + (int) ParkingPlan.area(pts) + " бл.²";
             }
             case INTERSECTION, ROUNDABOUT -> {
                 BlockPos c = a != null ? a : aim;
